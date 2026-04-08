@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useVoice } from '../hooks/useVoice'
+import { generateBookingPDF } from '../components/cards/BookingCard'
 import SharedHeader from '../components/SharedHeader'
 import ChatFeed from '../components/ChatFeed'
 import ChatInput from '../components/ChatInput'
@@ -7,11 +8,21 @@ import ChatInput from '../components/ChatInput'
 export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, onSwitchToDashboard, initialVehicle, chatState }) {
   const {
     sessionId, messages, stage, isTyping,
-    lastBotText, sendMessage, sendImage, sendFeedback, goBackToRecs,
+    lastBotText, lastBookingCard, sendMessage, sendImage, sendFeedback, goBackToRecs,
   } = chatState
 
-  const { voiceEnabled, isListening, isTtsPlaying, toggleMic, speakLastResponse } =
-    useVoice(sendMessage, lastBotText, sessionId)
+  // Intercept voice commands before they reach sendMessage:
+  // "download" → trigger PDF if booking is confirmed; everything else passes through normally.
+  const handleVoiceTranscript = useCallback((text) => {
+    if (/\bdownload\b/i.test(text) && lastBookingCard) {
+      generateBookingPDF(lastBookingCard)
+      return
+    }
+    sendMessage(text)
+  }, [sendMessage, lastBookingCard])
+
+  const { sttSupported, isListening, isTtsPlaying, interimText, toggleMic } =
+    useVoice(handleVoiceTranscript, lastBotText, sessionId)
 
   const vehicleSentRef = useRef(false)
 
@@ -60,11 +71,11 @@ export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, on
             onSend={sendMessage}
             onSendImage={sendImage}
             isTyping={isTyping}
-            voiceEnabled={voiceEnabled}
+            sttSupported={sttSupported}
             isListening={isListening}
             isTtsPlaying={isTtsPlaying}
+            interimText={interimText}
             onToggleMic={toggleMic}
-            onTts={speakLastResponse}
           />
 
         </div>

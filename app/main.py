@@ -1044,16 +1044,32 @@ def _build_recommendation_cards(session: SessionState, user) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _PERSONA = (
-    "You are Alex, a warm and knowledgeable Costco Tyre Advisor — like a trusted friend "
-    "who happens to know everything about tyres. "
-    "Speak naturally and conversationally, not like a chatbot or salesperson. "
-    "Always use the member's first name at least once. "
-    "Reference their specific situation — their city, vehicle, driving habits, or membership tier — "
-    "to make every reply feel personal, not generic. "
-    "Be encouraging and upbeat, but never pushy or over-the-top. "
-    "Keep responses short: the UI shows the details, your job is the human connection. "
-    "NEVER ask for the member's name, city, or vehicle — all of that comes from their profile. "
-    "NEVER ask for information you already have. Just use it."
+    "You are Alex, a real person at Costco who genuinely loves helping members find the right tyres. "
+    "You text the way a knowledgeable friend would — casual, warm, and direct. "
+
+    # ── Tone & language rules ──────────────────────────────────────────────
+    "Always use contractions: I'll, you're, that's, it's, we've, don't, can't, won't. "
+    "Never write 'I am' when you can write 'I'm'. Never write 'you are' when you can write 'you're'. "
+    "Use the member's first name naturally — once per reply, not every sentence. "
+    "React like a human: 'Nice!', 'Oh, good choice.', 'Yeah, that one's solid.' — "
+    "brief, genuine reactions before getting to the point. "
+    "Use natural pauses with commas: 'So, based on your Camry...' not 'Based on your Camry'. "
+    "Occasionally start with 'So,', 'Well,', 'Right,', or 'Actually,' to sound human. "
+    "Use 'and' and 'but' at the start of sentences when it flows naturally. "
+
+    # ── What to avoid ──────────────────────────────────────────────────────
+    "NEVER sound like a press release, FAQ, or customer-service script. "
+    "NEVER use phrases like: 'Certainly!', 'Absolutely!', 'Great question!', "
+    "'I'd be happy to', 'As your tyre advisor', 'rest assured', 'please note'. "
+    "NEVER use corporate filler. If you can cut a word, cut it. "
+    "NEVER repeat information the UI already shows on the card. "
+    "NEVER ask for info you already have — name, city, vehicle are all in the profile. "
+
+    # ── Structure ──────────────────────────────────────────────────────────
+    "Keep replies short: 1–2 sentences max unless context demands more. "
+    "The cards and UI handle the details — your job is the human connection. "
+    "Reference their specific situation — vehicle, city, driving habits, tier — "
+    "to make the reply feel personal, not copy-pasted."
 )
 
 # ---------------------------------------------------------------------------
@@ -1161,13 +1177,18 @@ def _detect_intent(msg: str, session: SessionState) -> str:
         return "add_cart"
     if re.search(r"\bcompar|side.by.side|\bvs\b|\bversus\b", m):
         return "compare"
-    if re.search(r"\bbook\b|\bschedule\b|\bappointment\b|\binstall\b", m):
+    if re.search(r"\bbook\b|\bschedule\b|\bappointment\b|\binstall\b|\bslot\b", m):
         return "book_slot"
     if re.search(r"\bcancel\b|\bgo back\b|\bstart over\b|\brestart\b", m):
         return "cancel"
 
     # ── Tier 2 — Stage-sensitive rules ───────────────────────────────────────
     # Context matters here — same word means different things in different stages.
+
+    # When cart is confirmed, "yes" / "sure" / "go ahead" mean "confirm payment" not add-to-cart
+    if session.stage == "cart":
+        if re.search(r"^yes\b|^yeah\b|^yep\b|^sure\b|^ok\b|^okay\b|^go ahead\b|^proceed\b|^confirm\b|^pay\b|^sounds good\b", m):
+            return "confirm_pay"
 
     if session.stage == "confirm_vehicle":
         # ── SAME VEHICLE — checked FIRST.
@@ -1193,7 +1214,17 @@ def _detect_intent(msg: str, session: SessionState) -> str:
         if re.search(r"\bmy (?!bad\b|mistake\b|oops\b|fault\b)\w+", m):
             return "same_vehicle"
 
-        # ── TRIP / DESTINATION CONTEXT — only when "same" is NOT present
+        # ── CAR BRAND / TYRE SIZE — check FIRST so "going to Bombay with Tata Nexon"
+        # is treated as new_vehicle_detail, not destination context.
+        if re.search(r"\d{3}/\d{2}R\d{2}", msg, re.IGNORECASE):
+            return "new_vehicle_detail"
+        if re.search(r"\b(honda|toyota|ford|bmw|mercedes|audi|kia|hyundai|nissan|chevrolet|"
+                     r"subaru|mazda|volkswagen|maruti|tata|mahindra|mg|skoda|renault)\b", m):
+            return "new_vehicle_detail"
+        # Different vehicle signals
+        if re.search(r"\bnew\b|^no\b|differ|just got|bought|have a|got a|switched|changed", m):
+            return "new_vehicle"
+        # ── TRIP / DESTINATION CONTEXT — only when no car brand detected above
         # Includes Hindi travel phrases and major Indian city names.
         if re.search(
             r"road trip|long drive|travel|journey|trip to|going to|heading to|"
@@ -1201,22 +1232,13 @@ def _detect_intent(msg: str, session: SessionState) -> str:
             # Hindi travel phrases
             r"ja raha|ja rahi|jaana|safar|nikal raha|nikal rahi|chal raha|jaa raha|"
             # Major Indian cities — any mention = destination context
-            r"\bmumbai\b|\bdelhi\b|\bbangalore\b|\bbengaluru\b|\bchennai\b|"
+            r"\bmumbai\b|\bbombay\b|\bdelhi\b|\bbangalore\b|\bbengaluru\b|\bchennai\b|"
             r"\bhyderabad\b|\bpune\b|\bkolkata\b|\bjaipur\b|\bahmedabad\b|"
             r"\bsurat\b|\bchandigarh\b|\bindore\b|\bnagpur\b|\blucknow\b|"
             r"\bgoa\b|\bkochi\b|\bvishakapatnam\b|\bvizag\b",
             m
         ):
             return "context_then_vehicle"
-        # Different vehicle signals
-        if re.search(r"\bnew\b|^no\b|differ|just got|bought|have a|got a|switched|changed", m):
-            return "new_vehicle"
-        # Explicit tyre size or car brand typed directly
-        if re.search(r"\d{3}/\d{2}R\d{2}", msg, re.IGNORECASE):
-            return "new_vehicle_detail"
-        if re.search(r"\b(honda|toyota|ford|bmw|mercedes|audi|kia|hyundai|nissan|chevrolet|"
-                     r"subaru|mazda|volkswagen|maruti|tata|mahindra|mg|skoda|renault)\b", m):
-            return "new_vehicle_detail"
 
     if session.stage == "collect_vehicle":
         return "new_vehicle_detail"
@@ -1226,7 +1248,7 @@ def _detect_intent(msg: str, session: SessionState) -> str:
         return "add_cart"
     if re.search(r"view details|select this|i.ll take|choose|i.ll go with|i want this", m):
         return "select_tyre"
-    if re.search(r"\bconfirm\b|pay now|complete.*order|place order", m):
+    if re.search(r"\bconfirm\b|pay now|complete.*order|place order|confirm.*pay|pay.*confirm|let'?s pay|yes.*pay|go ahead.*pay|proceed.*pay", m):
         return "confirm_pay"
     if re.search(r"\bpick\b|\bchoose\b|\bselect\b|\bwant\b|go with", m):
         return "select_tyre"
@@ -1935,7 +1957,8 @@ async def chat(req: ChatRequest):
             else:
                 session.cart_id = result["cart_id"]
                 session.stage = "cart"
-                from app.services.stock_service import get_tyre_by_id
+                from app.services.stock_service import get_tyre_by_id, get_stock_badge
+                from app.tools.appointment_tools import get_nearby_locations
                 tyre = get_tyre_by_id(tyre_id)
                 system = (
                     f"{_PERSONA} "
@@ -1950,6 +1973,24 @@ async def chat(req: ChatRequest):
                     f"Cashback estimate: ${result['cashback_estimate']:.2f} | Cart held 15 mins"
                 )
                 response_text = _llm_respond(req.session_id, system, ctx)
+
+                # Build a single cart card so the tyre info is visible below the confirmation
+                if tyre:
+                    try:
+                        _locs = json.loads(get_nearby_locations.invoke({"city": user.location.city}))
+                    except Exception:
+                        _locs = []
+                    _subtotal_fmt = f"${result['subtotal']:.2f}"
+                    _savings_fmt  = f"${result['member_savings']:.2f}"
+                    cards = [{
+                        "tyre": tyre.model_dump(),
+                        "slot_tag": "In Cart",
+                        "personalised_msg": (
+                            f"4 tyres · {_subtotal_fmt} · saving {_savings_fmt}"
+                        ),
+                        "stock_badge": get_stock_badge(tyre, _locs),
+                        "punch_line": None,
+                    }]
         else:
             response_text = "Please tap **Add to Cart** on one of the tyre cards above."
 

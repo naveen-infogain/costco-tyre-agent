@@ -120,16 +120,17 @@ costco-tyre-agent/
 │       └── components/
 │           ├── SharedHeader.jsx       # Common header for Store + Agent pages
 │           ├── ChatFeed.jsx           # Scrollable message feed (all message types)
-│           ├── ChatInput.jsx          # Textarea + mic + send pill
+│           ├── ChatInput.jsx          # Textarea + mic + TTS + send pill
 │           ├── QuickReplies.jsx       # Quick reply chips (greyed after use)
 │           ├── RecoveryBanner.jsx     # Drop recovery banner
 │           └── cards/
-│               ├── TyreCard.jsx       # Individual tyre card (active/inactive state)
-│               ├── CardsGrid.jsx      # Cover-flow carousel of TyreCards
+│               ├── TyreCard.jsx       # Individual tyre card (active/inactive/"In Cart" state)
+│               ├── CardsGrid.jsx      # Infinite cover-flow carousel of TyreCards
 │               ├── DetailActions.jsx  # Add to Cart + Back buttons after detail view
 │               ├── CompareCard.jsx    # Side-by-side comparison table
-│               ├── SlotPicker.jsx     # Appointment slot chips
-│               └── BookingCard.jsx    # Booking confirmation + jsPDF download
+│               ├── SlotPicker.jsx     # Appointment slot chips + custom slot trigger
+│               ├── CustomSlotModal.jsx # iOS drum-style date+time picker (scroll-snap)
+│               └── BookingCard.jsx    # Booking confirmation + jsPDF invoice download
 ├── requirements.txt
 └── .env.example
 ```
@@ -188,6 +189,12 @@ Key state and functions:
 - `sendFeedback(signal, tyreId, agent)` — POSTs to `/feedback`
 - `handleLoginResponse(data)` — called by App after sign-in to seed the first welcome message
 
+**Positive intent detection (add-to-cart shortcut):**
+- Module-level `POSITIVE_INTENT` regex matches natural phrases: "yes", "sure", "I'll take it", "perfect", "add it", "sounds good", etc.
+- `lastDetailRef` persists the last viewed tyre (`{ tyreId, slotTag }`) even after `detail_actions` is injected
+- When `POSITIVE_INTENT` matches AND `lastDetailRef.current.tyreId` is set, `sendMessage` rewrites `backendMsg` to `"add to cart {tyreId}"` — the user bubble still shows their original phrase
+- `lastDetailRef` is cleared after the rewrite so a second "yes" doesn't re-add the same tyre
+
 **Message types** handled by `ChatFeed`:
 | type | Component | Notes |
 |------|-----------|-------|
@@ -202,36 +209,75 @@ Key state and functions:
 
 ### Tyre Recommendation Carousel (`components/cards/CardsGrid.jsx`)
 
-- **Cover-flow carousel** — no arrow buttons; click a side card to bring it to centre
-- `activeIdx` state (default `0` = Top Pick at centre)
-- `posClass(idx)` maps distance from activeIdx to CSS class:
+- **Infinite cover-flow carousel** — no arrow buttons; click a side card to bring it to centre; wraps circularly
+- `reorderCards()` runs on mount: moves Top Pick to index 1, Runner-up to index 0, Budget Alt to index 2 — so the default centre is always Top Pick
+- `activeIdx` default = `1` (Top Pick at centre); `prev()` and `next()` wrap with modulo arithmetic
+- `posClass(idx)` uses modular distance to handle wrapping:
+  - `d = idx - activeIdx`; if `d > floor(n/2)` subtract `n`; if `d < -floor(n/2)` add `n`
   - `cc-center` — hero card, full scale, drop-shadow
-  - `cc-left1` / `cc-right1` — adjacent cards, 86% scale, 72% opacity
-  - `cc-left2` / `cc-right2` — far cards, 72% scale, 38% opacity, pointer-events none
+  - `cc-left1` / `cc-right1` — adjacent cards, 86% scale
+  - `cc-left2` / `cc-right2` — far cards, 72% scale, pointer-events none
+- Side cards are subdued: `opacity: 0.45; filter: brightness(0.88) saturate(0.6)`
 - Dot indicators below for navigation
 - "Compare side by side" toggle below dots → shows `CompareCard`
+- Carousel height = card height + 4px top/bottom padding (`cc-wrapper` bg `#F0F2F5`)
 
-**`TyreCard.jsx`** — `active` prop:
-- `active=true` (centre card): shows Add to Cart, Details, thumbs up/down buttons
-- `active=false` (side cards): hides action buttons, shows "Tap to view" hint
+**`TyreCard.jsx`** — `active` prop + `slot_tag` variants:
+- `active=true` (centre card): shows Details, thumbs up/down; Add to Cart hidden when `slot_tag === "In Cart"`
+- `active=false` (side cards): hides all action buttons, shows "Tap to view" hint
+- `slot_tag === "In Cart"`: green pill (`#1A8754`), `shopping_cart_checkout` icon — shown after add-to-cart confirmation
+- Card layout (top to bottom): slot-tag pill → brand (gray caps) → model (bold) → size/season/terrain → price row → rating row → stock inline (no pill bg) → punch line or personalised msg → tread/warranty line
 
 ### Detail View Flow
 
 When user clicks "Details" on a card:
 1. `handleDetails(tyreId, slotTag)` in CardsGrid calls `onSendMessage("I'd like to view details for the {slotTag} option ({tyreId})")`
-2. `useChat.sendMessage` detects the details pattern via regex → sets `detailContextRef`
+2. `useChat.sendMessage` detects the details pattern via regex → sets `detailContextRef` **and** `lastDetailRef`
 3. Bot responds with detail text (rendered as `BotBubble`)
 4. `useChat` auto-injects a `detail_actions` message: `{ type: 'detail_actions', tyreId, slotTag }`
 5. `DetailActions` component renders two buttons:
    - **Add to Cart** → `sendMessage("add to cart {tyreId}")`
    - **Back to Recommendations** → `goBackToRecs()` re-appends the carousel
 
-### Voice (`hooks/useVoice.js`)
+### Add-to-Cart Confirmation Flow
 
-- Checks `/voice/status` on mount — disables voice UI if `ELEVENLABS_API_KEY` not set
-- STT: Web Speech API (`SpeechRecognition`) — mic button toggles listening
-- TTS: POST to `/voice/tts` (ElevenLabs stream) — speaker button reads last bot response
-- Mic button shows disabled state if voice not available
+After `add to cart {tyreId}` is processed by the backend:
+1. Backend `cart_service.add_to_cart()` reserves stock for 15 minutes
+2. LLM writes a 1-sentence confirmation (e.g. "Done, Ed — you're saving $133 on those Alpines. 🛒")
+3. Backend returns `cards` with a **single "In Cart" card** showing the tyre details + `"4 tyres · $xxx · saving $xx"` personalised msg
+4. Frontend renders the confirmation bubble followed by the cart tyre card
+5. Quick replies change to `["Confirm & Pay", "Go back"]`
+
+### Custom Slot Picker (`components/cards/CustomSlotModal.jsx`)
+
+Triggered by the "Pick date & time" card in `SlotPicker.jsx`:
+- Single drum row: **Date** | divider | **Hour** | `:` | **Minute** | divider | **AM/PM**
+- `DrumColumn` component uses `scroll-snap-type: y mandatory` with spacer divs (height = `ITEM_H × 2`) so first/last items can centre
+- `buildDates()` generates 30 days: "Today", "Tomorrow", then named dates (e.g. "Thu Apr 10")
+- On confirm: converts `YYYY-MM-DD` + 12h → 24h time, sends `"Book the slot on {isoDate} at {HH:MM}"`
+- Backend regex: `r"(\d{4}-\d{2}-\d{2})[^\d]+(\d{2}:\d{2})"` — must receive ISO date + 24h time
+
+### Voice (`hooks/useVoice.js`) — COMPLETE ✅
+
+- `STT_SUPPORTED` checked once at module load (`window.SpeechRecognition || window.webkitSpeechRecognition`)
+- Checks `/voice/status` on mount — `voiceEnabled` state controls TTS button visibility
+- **STT**: `buildRecognition()` creates a **fresh** `SpeechRecognition` instance every toggle (never reused — avoids stale-state restart bugs)
+  - `listeningRef` sync ref ensures callbacks see current state
+  - `interimText` state exposes live partial transcript to `ChatInput` textarea
+  - On final result → `_stopListening()` → `onTranscript(final.trim())` → message sent
+- **TTS**: POST to `/voice/tts` (ElevenLabs stream) → `blob()` → `URL.createObjectURL` → `Audio.play()`
+  - Toggle: if already playing, pause and clear
+  - `isTtsPlaying` state drives speaker button icon (`volume_up` / `stop_circle`)
+- Returns: `{ voiceEnabled, sttSupported, isListening, isTtsPlaying, interimText, toggleMic, speakLastResponse }`
+
+**`ChatInput.jsx`** wiring:
+- Mic button: `{sttSupported && (...)}` — only renders if browser supports STT
+- TTS button: `{voiceEnabled && (...)}` — only renders if ElevenLabs configured
+- Textarea shows `interimText` live; `readOnly={isListening}` prevents manual typing during STT
+- Input bar: `.listening-active` class adds red glow; `.mic-pulse` span shows ripple animation
+
+**`app/services/voice_service.py`**:
+- `optimize_streaming_latency` only added for `turbo` or `flash` model IDs (deprecated in `eleven_v3+`)
 
 ### CSS Architecture (`src/index.css`)
 
@@ -242,43 +288,109 @@ Single file, organised by section with ASCII dividers:
 - Store page (`.cs-*`)
 - Shared header (`.sh-*`)
 - Agent page (`.agent-*`, `.ta-*` for TireAssist components)
-- Tyre cards (`.tyre-card`, `.card-*`, `.slot-tag`, `.price-row`, etc.)
-- Carousel (`.cc-*`)
+- Tyre cards (`.tyre-card`, `.card-content`, `.slot-tag`, `.slot-tag.in-cart`, `.price-row`, `.punch-row`, `.stock-inline`, etc.)
+- Carousel (`.cc-*`) — side cards: `opacity: 0.45; filter: brightness(0.88) saturate(0.6)`
 - Detail actions (`.detail-actions`)
 - Compare card (`.compare-*`)
-- Booking card, slot picker, recovery banner
+- Slot picker (`.slot-chip`, `.slot-chip-custom` dashed border)
+- Drum picker (`.drum-col`, `scroll-snap-type: y mandatory`, fade masks `::before`/`::after`, `.drum-selected`)
+- Booking card (`.bc-tiles` → 4-column grid, `.bc-sections` → 2-column)
+- Recovery banner
+- Voice (`.mic-pulse` `@keyframes mic-ring`, `.ta-input-bar.listening-active` red glow, `.ta-input-textarea.interim` italic)
+
+---
+
+## Completed Work Log
+
+### ✅ Task 5 — Voice Integration
+- `useVoice.js` fully implemented: STT (Web Speech API) + TTS (ElevenLabs streaming)
+- Fresh `SpeechRecognition` instance per session — no stale-state restart bugs
+- `interimText` live transcript shown in textarea while speaking
+- `ChatInput` mic button renders only when browser supports STT; TTS button only when `ELEVENLABS_API_KEY` set
+- `voice_service.py`: `optimize_streaming_latency` conditional (only for turbo/flash models — deprecated in eleven_v3+)
+- Needs: `ELEVENLABS_API_KEY` in `.env`; test on Chrome (STT not supported on Firefox/Safari)
+
+### ✅ Carousel Redesign
+- Infinite circular wrapping via modular arithmetic in `posClass()`
+- Default order: Runner-up (left) | **Top Pick (centre)** | Budget Alt (right)
+- Side cards subdued: `opacity: 0.45; filter: brightness(0.88) saturate(0.6)`
+- Height = card + 4px padding, light grey background
+
+### ✅ TyreCard Redesign
+- Flat layout (no coloured header), all content in `.card-content`
+- `slot_tag === "In Cart"` → green pill, `shopping_cart_checkout` icon, no Add to Cart button
+- Removed promo chip entirely
+
+### ✅ Slot Picker + Custom Slot
+- `SlotPicker.jsx` shows suggested slots as chips + a "Pick date & time" card (dashed border)
+- `CustomSlotModal.jsx` — iOS drum-style picker (scroll-snap, no calendar)
+- Custom slot confirms as ISO date + 24h time matching backend regex
+
+### ✅ Booking Card + PDF Invoice
+- 4 tiles in one horizontal row (Date / Time / Location / Order) + 2-column sections below
+- PDF redesigned: navy header, green badge with drawn checkmark (two `line()` calls — no Unicode glyphs in jsPDF helvetica), KV rows, "What to bring" rectangles, numbered navy circles for "What happens next"
+
+### ✅ Add-to-Cart Confirmation Card
+- After cart add, backend returns a single "In Cart" tyre card alongside the confirmation message
+- Positive intent detection in `useChat.js` — "yes", "I'll take it", "perfect", etc. auto-convert to `add to cart {tyreId}` when a tyre is in focus
+
+### ✅ Image Analysis Fixes
+- "Unknown" brand filtered from image search messages
+- Tyre health scoring made liberal: default ≥7 unless obvious damage; dirt/grime does not reduce score
+- Auto-broadening when image search returns 0 results (matches chat flow)
+
+### ✅ Encoding Fix — Location Names
+- Windows `read_text()` without `encoding='utf-8'` corrupted UTF-8 em-dash to `â€"` (cp1252)
+- Fixed all 3 `locations.json` reads in `main.py` with `encoding='utf-8'`
+- `stock_service.py` regex uses `[-\u2013\u2014]` Unicode escapes instead of raw em-dash characters
 
 ---
 
 ## Pending Tasks for Next Developer
 
-### Task 5 — Voice Integration End-to-End
-- `useVoice.js` hook is fully wired; only needs `ELEVENLABS_API_KEY` in `.env`
-- Test: mic button → speech → `sendMessage` → bot response → TTS reads it aloud
-- ElevenLabs voice ID configured via `ELEVENLABS_VOICE_ID` env var
+### Task 6 — Voice Feature Enhancements
 
-### Task 6 — Checkout & Payment Flow (UI side)
-- "Add to Cart" currently sends `add to cart {tyreId}` as a chat message
-- The backend cart/payment pipeline already handles this
-- **TODO:** Build a proper cart drawer/page in React:
-  - Show cart items, quantity, member pricing, savings
-  - Costco Visa auto-detect + cashback display
-  - Confirm order → triggers appointment booking flow
+#### Completed ✅
+- Speaker button removed from `ChatInput`
+- Auto-TTS: when last user message came from mic (`voiceInputRef.current = true`), bot response is automatically spoken via ElevenLabs — no button needed
+- TTS playing indicator: animated 5-dot wave below the input bar (`.tts-wave-bar`), input bar glows blue (`.tts-active`)
+- Mic button disabled while TTS is playing (prevents overlap)
+- `_humanise_for_tts()` in `voice_service.py`: strips markdown/codes, converts lists to natural sentences, expands abbreviations, converts prices to spoken form ("169 dollars and 99 cents"), removes emojis and tyre ID codes
+- Content safety gate in `voice_service.py`: `_BLOCKED_PATTERNS` regex blocks inappropriate language before it reaches ElevenLabs API
 
-### Task 7 — Appointment Booking UI Polish
-- `SlotPicker.jsx` renders appointment slots as chips — works but basic
-- **TODO:** Calendar-style slot picker (date tabs + time grid)
-- Show predicted wait time per slot (from `predict_wait_times` backend)
-- After booking: `BookingCard` shows confirmation + `.ics` download
+#### 6a — Auto-TTS (read bot responses aloud automatically)
+- Currently TTS is manual — user must click the speaker button after each bot response
+- **TODO:** Add a toggle in the UI ("Auto-read responses") that, when on, calls `speakLastResponse()` automatically after every bot message
+- Suggested: small toggle chip near the input bar; persist preference in `localStorage`
+- Hook location: `useVoice.js` — watch `lastBotText` in a `useEffect`, call `speakLastResponse()` if auto-mode is on and TTS is not already playing
 
-### Task 8 — Mobile Responsive Polish
-- Breakpoints exist at 768px in CSS
-- **TODO:** Test on mobile viewport, especially the carousel (may need swipe gesture support)
-- Swipe on `cc-wrapper` → advance `activeIdx` (use `onTouchStart`/`onTouchEnd` in CardsGrid)
+#### 6b — Voice-Driven Full Conversation Mode
+- **TODO:** After STT sends a message and bot replies, automatically re-activate the mic so the user never has to touch the screen
+- Flow: user speaks → `onTranscript` → bot responds → TTS plays → on TTS `audio.onended` → re-activate mic (if "hands-free mode" toggle is on)
+- Guard: do NOT re-activate mic if user manually stopped listening or if the session stage is `complete`
+- Hook location: `useVoice.js` — in `audio.onended` callback, check `handsFreeModeRef` and call `toggleMic()`
 
-### Task 9 — Dashboard Integration
-- `GET /dashboard` serves `app/dashboard/static/dashboard.html` (plain HTML, existing)
-- **TODO:** Optionally embed or link dashboard from SharedHeader or a new "Admin" page in React
+#### 6c — Voice Persona Selection
+- ElevenLabs supports multiple voices; `ELEVENLABS_VOICE_ID` is currently a single env var
+- **TODO:** Expose a voice selector in the UI (3–4 preset voices: e.g. Rachel, Josh, Elli, Antoni)
+- Backend: `GET /voice/voices` endpoint returns available voice options (id + name)
+- Frontend: small selector (icon chips or a dropdown) in `AgentPage` or `ChatInput`
+- When user picks a voice, store in `localStorage` and send `voice_id` as param in the `/voice/tts` POST body
+- Backend: `voice/tts` endpoint reads `voice_id` from request body (falls back to `ELEVENLABS_VOICE_ID` env var)
+
+#### 6d — STT Error Recovery & Feedback
+- Current: mic errors are silently swallowed (`console.warn` only)
+- **TODO:** On STT error (e.g. `no-speech`, `network`, `not-allowed`):
+  - `no-speech` → show a brief toast "Didn't catch that — tap mic to try again"
+  - `not-allowed` → show persistent banner "Microphone access denied — enable in browser settings"
+  - `network` → fall back gracefully, show "Voice unavailable — type your message"
+- Suggested: add a `sttError` state in `useVoice.js`, render a small error chip above the input bar in `ChatInput`
+
+#### 6e — TTS Playback Controls
+- Current: speaker button toggles play/stop; no progress indication
+- **TODO:** Show a waveform animation or progress bar while TTS is playing (`.isTtsPlaying` is already exposed)
+- Suggested: animated dots or a thin progress bar at the bottom of the bot bubble that's being read
+- Optional: speed control (0.75×, 1×, 1.25×) — ElevenLabs supports `speaking_rate` in the payload
 
 ---
 

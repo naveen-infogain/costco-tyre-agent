@@ -1,3 +1,14 @@
+// Only show stages that are meaningful to the member — internal transition
+// stages (confirm_vehicle, collect_vehicle, enter, login) are hidden.
+const STAGE_LABEL = {
+  browse:   'Browsing',
+  detail:   'Viewing Details',
+  cart:     'In Cart',
+  pay:      'Checkout',
+  book:     'Booking',
+  complete: 'Order Complete',
+}
+
 export default function SharedHeader({ activePage, member, onSwitchToAgent, onSwitchToStore, onSwitchToDashboard, stage }) {
   const initials = member?.name
     ? member.name.slice(0, 2).toUpperCase()
@@ -43,9 +54,9 @@ export default function SharedHeader({ activePage, member, onSwitchToAgent, onSw
         </div>
       )}
 
-      {/* ── Stage pill (agent only) ───────────────────────────────── */}
-      {activePage === 'agent' && stage && (
-        <div className="sh-stage-pill">{stage}</div>
+      {/* ── Stage pill (agent only) — only show meaningful, user-facing stages */}
+      {activePage === 'agent' && STAGE_LABEL[stage] && (
+        <div className="sh-stage-pill">{STAGE_LABEL[stage]}</div>
       )}
 
       {/* ── Right: dashboard + member chip + cart ────────────────── */}

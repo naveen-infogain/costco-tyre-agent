@@ -1,8 +1,31 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 
-export default function ChatInput({ onSend, onSendImage, isTyping, voiceEnabled, isListening, isTtsPlaying, onToggleMic, onTts }) {
+export default function ChatInput({
+  onSend, onSendImage, isTyping,
+  sttSupported, isListening, isTtsPlaying, interimText,
+  onToggleMic,
+}) {
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
+
+  // Show interim transcript while speaking; clear when STT finalises and sends
+  useEffect(() => {
+    if (!textareaRef.current) return
+    if (interimText) {
+      textareaRef.current.value = interimText
+      autoResize()
+    } else {
+      textareaRef.current.value = ''
+      textareaRef.current.style.height = 'auto'
+    }
+  }, [interimText])
+
+  function autoResize() {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = Math.min(ta.scrollHeight, 100) + 'px'
+  }
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -11,16 +34,9 @@ export default function ChatInput({ onSend, onSendImage, isTyping, voiceEnabled,
     }
   }
 
-  function handleInput() {
-    const ta = textareaRef.current
-    if (!ta) return
-    ta.style.height = 'auto'
-    ta.style.height = Math.min(ta.scrollHeight, 100) + 'px'
-  }
-
   function submit() {
     const val = textareaRef.current?.value.trim()
-    if (!val || isTyping) return
+    if (!val || isTyping || isListening) return
     textareaRef.current.value = ''
     textareaRef.current.style.height = 'auto'
     onSend(val)
@@ -29,12 +45,12 @@ export default function ChatInput({ onSend, onSendImage, isTyping, voiceEnabled,
   function handleFileChange(e) {
     const file = e.target.files?.[0]
     if (file) onSendImage(file)
-    e.target.value = ''   // reset so same file can be re-selected
+    e.target.value = ''
   }
 
   return (
-    <div className="ta-input-bar">
-      {/* Hidden file input for image uploads */}
+    <div className={`ta-input-bar${isListening ? ' listening-active' : ''}${isTtsPlaying ? ' tts-active' : ''}`}>
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -42,56 +58,65 @@ export default function ChatInput({ onSend, onSendImage, isTyping, voiceEnabled,
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
+
       <textarea
         ref={textareaRef}
-        className="ta-input-textarea"
-        placeholder="Type your message…"
+        className={`ta-input-textarea${isListening ? ' interim' : ''}`}
+        placeholder={isListening ? 'Listening…' : isTtsPlaying ? 'Speaking…' : 'Type your message…'}
         rows={1}
         aria-label="Message input"
         autoComplete="off"
         onKeyDown={handleKeyDown}
-        onInput={handleInput}
+        onInput={autoResize}
         disabled={isTyping}
+        readOnly={isListening}   // prevent manual typing while mic is on
       />
 
-      {/* Action pill — image + mic + send */}
       <div className="ta-input-pill">
+        {/* Image search */}
         <button
           className="ta-pill-btn ta-pill-image"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isTyping}
-          title="Upload tyre image for analysis"
+          disabled={isTyping || isListening}
+          title="Upload tyre image"
         >
           <span className="material-symbols-rounded">image_search</span>
         </button>
-        {voiceEnabled && isTtsPlaying && (
-          <button className="ta-pill-btn" onClick={onTts} title="Stop reading">
-            <span className="material-symbols-rounded">stop_circle</span>
+
+        {/* Mic — only when browser supports Web Speech API */}
+        {sttSupported && (
+          <button
+            className={`ta-pill-btn ta-pill-mic${isListening ? ' listening' : ''}`}
+            onClick={onToggleMic}
+            disabled={isTyping || isTtsPlaying}
+            title={isListening ? 'Stop listening' : 'Voice input'}
+          >
+            <span className="material-symbols-rounded">
+              {isListening ? 'mic' : 'mic'}
+            </span>
+            {isListening && <span className="mic-pulse" />}
           </button>
         )}
-        {voiceEnabled && !isTtsPlaying && (
-          <button className="ta-pill-btn" onClick={onTts} title="Read aloud">
-            <span className="material-symbols-rounded">volume_up</span>
-          </button>
-        )}
-        <button
-          className={`ta-pill-btn ta-pill-mic${isListening ? ' listening' : ''}`}
-          onClick={onToggleMic}
-          title={isListening ? 'Stop listening' : 'Voice input'}
-        >
-          <span className="material-symbols-rounded">
-            {isListening ? 'mic_off' : 'mic'}
-          </span>
-        </button>
+
+        {/* Send */}
         <button
           className="ta-pill-btn ta-pill-send"
           onClick={submit}
-          disabled={isTyping}
+          disabled={isTyping || isListening}
           title="Send"
         >
           <span className="material-symbols-rounded">send</span>
         </button>
       </div>
+
+      {/* TTS playing indicator — subtle wave below the bar */}
+      {isTtsPlaying && (
+        <div className="tts-wave-bar" aria-label="Speaking…">
+          {[...Array(5)].map((_, i) => (
+            <span key={i} className="tts-wave-dot" style={{ animationDelay: `${i * 0.12}s` }} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

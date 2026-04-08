@@ -7,6 +7,7 @@ const SLOT_ICONS = {
   'Most Popular': 'local_fire_department',
   'Runner-up': 'thumb_up',
   'Budget Alt': 'savings',
+  'In Cart': 'shopping_cart_checkout',
 }
 
 function stars(rating) {
@@ -38,7 +39,7 @@ export default function TyreCard({ card, idx, selected, active = true, onAddToCa
       <div className="card-content">
 
         {/* Slot tag pill */}
-        <div className="slot-tag">
+        <div className={`slot-tag${card.slot_tag === 'In Cart' ? ' in-cart' : ''}`}>
           <span className="material-symbols-rounded">{icon}</span>
           {card.slot_tag || 'Pick'}
         </div>
@@ -101,10 +102,12 @@ export default function TyreCard({ card, idx, selected, active = true, onAddToCa
       {/* Action buttons */}
       {active && (
         <div className="card-actions">
-          <button className="btn-cart" title="Add to Cart" onClick={() => onAddToCart(t.id, card.slot_tag, idx)}>
-            <span className="material-symbols-rounded">shopping_cart</span>
-          </button>
-          <button className="btn-info" title="Details" onClick={() => onDetails(t.id, card.slot_tag, idx)}>
+          {card.slot_tag !== 'In Cart' && (
+            <button className="btn-cart" title="Add to Cart" onClick={() => onAddToCart(t.id, card.slot_tag, idx)}>
+              <span className="material-symbols-rounded">shopping_cart</span>
+            </button>
+          )}
+          <button className="btn-info" title="Details" disabled>
             <span className="material-symbols-rounded">info</span>
           </button>
           <div style={{ flex: 1 }} />

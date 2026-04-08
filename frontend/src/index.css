@@ -156,6 +156,7 @@ html, body { height: 100%; font: 400 16px/24px 'Roboto', sans-serif; background:
   margin-bottom: 6px;
 }
 .slot-tag .material-symbols-rounded { font-size: 12px; }
+.slot-tag.in-cart { background: #1A8754; }
 
 .card-brand { font: 600 10px/13px 'Roboto', sans-serif; color: #999; text-transform: uppercase; letter-spacing: .8px; }
 .card-model { font: 700 16px/22px 'Roboto', sans-serif; color: #1C1B1F; }
@@ -1902,12 +1903,15 @@ html, body { height: 100%; font: 400 16px/24px 'Roboto', sans-serif; background:
 /* ── Input bar ──────────────────────────────────────────────────────────── */
 .ta-input-bar {
   flex-shrink: 0;
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 10px;
   padding: 12px 16px 16px;
   border-top: 1px solid #F0F0F0;
   background: #fff;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .ta-input-textarea {
@@ -1947,7 +1951,60 @@ html, body { height: 100%; font: 400 16px/24px 'Roboto', sans-serif; background:
 .ta-pill-btn:hover { background: rgba(255,255,255,.28); }
 .ta-pill-btn:disabled { opacity: .4; cursor: not-allowed; }
 .ta-pill-btn .material-symbols-rounded { font-size: 18px; }
-.ta-pill-mic.listening { background: rgba(255,255,255,.35); }
+.ta-pill-mic.listening {
+  background: rgba(239, 83, 80, .85);   /* red when active */
+  position: relative;
+}
+/* Ripple pulse ring around mic when listening */
+.mic-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(239, 83, 80, .7);
+  animation: mic-ring 1.1s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes mic-ring {
+  0%   { transform: scale(.8); opacity: .9; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+/* Input bar glows red while listening */
+.ta-input-bar.listening-active {
+  box-shadow: 0 0 0 2px rgba(239, 83, 80, .4);
+}
+/* Interim transcript text — italic / muted */
+.ta-input-textarea.interim { font-style: italic; opacity: .7; }
+
+/* Input bar pulses blue while TTS is speaking */
+.ta-input-bar.tts-active {
+  box-shadow: 0 0 0 2px rgba(79, 111, 243, .45);
+}
+
+/* Animated wave dots — absolutely positioned inside the bar so they don't affect layout */
+.tts-wave-bar {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.tts-wave-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(79, 111, 243, 0.55);
+  animation: tts-bounce 0.8s ease-in-out infinite;
+}
+@keyframes tts-bounce {
+  0%, 100% { transform: scaleY(1);   opacity: .5; }
+  50%       { transform: scaleY(2.2); opacity: 1;  }
+}
+
 .ta-pill-send { background: rgba(255,255,255,.25); }
 .ta-pill-image { border-right: 1px solid rgba(255,255,255,.2); }
 

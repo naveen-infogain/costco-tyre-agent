@@ -19,7 +19,8 @@
       "Read(//c/Users/satti.naveny/costco-tyre-agent/app/**)",
       "Bash(costco-tyres/Scripts/python scripts/add_tyres_265_60R18.py)",
       "Bash(costco-tyres/Scripts/python.exe scripts/add_tyres_265_60R18.py)",
-      "Bash(python -c \"import json; data=json.load\\(open\\('c:/Users/satti.naveen/costco-tyre-agent/app/data/locations.json', encoding='utf-8'\\)\\); print\\(repr\\(data[0]['name']\\)\\)\")"
+      "Bash(python -c \"import json; data=json.load\\(open\\('c:/Users/satti.naveen/costco-tyre-agent/app/data/locations.json', encoding='utf-8'\\)\\); print\\(repr\\(data[0]['name']\\)\\)\")",
+      "Bash(python -c \"import json; tyres=json.load\\(open\\('app/data/tyres.json'\\)\\); sizes=sorted\\(set\\(t['size'] for t in tyres\\)\\); print\\('\\\\n'.join\\(sizes\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\satti.naveen\\.claude\\projects\\c--Users-satti-naveen-costco-tyre-agent"

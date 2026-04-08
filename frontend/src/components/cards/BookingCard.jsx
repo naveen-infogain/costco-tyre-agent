@@ -1,9 +1,8 @@
 import { jsPDF } from 'jspdf'
 
-export default function BookingCard({ data: bc }) {
-  if (!bc) return null
-
-  function downloadPdf() {
+// Named export so AgentPage can call it directly from a voice "download" command
+export function generateBookingPDF(bc) {
+  if (!bc) return
     const NAVY     = [26, 58, 124]      // dark navy header
     const BLUE     = [26, 93, 192]      // section heading blue
     const DARK     = [28, 27, 31]       // body text
@@ -159,7 +158,10 @@ export default function BookingCard({ data: bc }) {
     doc.text('Thank you for shopping with Costco Tyre Centre', pageW / 2, footerY, { align: 'center' })
 
     doc.save(`Costco_Booking_${bc.booking_id}.pdf`)
-  }
+}
+
+export default function BookingCard({ data: bc }) {
+  if (!bc) return null
 
   return (
     <div className="full-width">
@@ -221,7 +223,7 @@ export default function BookingCard({ data: bc }) {
           </div>
         </div>
 
-        <button className="bc-download-btn" onClick={downloadPdf}>
+        <button className="bc-download-btn" onClick={() => generateBookingPDF(bc)}>
           <span className="material-symbols-rounded">download</span>
           Download Booking Confirmation
         </button>
