@@ -6,12 +6,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/chat':         'http://localhost:8000',
-      '/feedback':     'http://localhost:8000',
-      '/health':       'http://localhost:8000',
-      '/demo-members': 'http://localhost:8000',
-      '/voice':        'http://localhost:8000',
-      '/dashboard':    'http://localhost:8000',
+      '/chat':           'http://localhost:8000',
+      '/feedback':       'http://localhost:8000',
+      '/health':         'http://localhost:8000',
+      '/demo-members':   'http://localhost:8000',
+      '/voice':          'http://localhost:8000',
+      '/dashboard':      'http://localhost:8000',
+      '/image-analyse':  'http://localhost:8000',
     }
   }
 })

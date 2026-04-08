@@ -14,7 +14,12 @@
       "Bash(python3 -c ':*)",
       "Bash(node -e ':*)",
       "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('c:/Users/satti.naveen/costco-tyre-agent/frontend/src/index.css','utf-8'\\);const s=c.indexOf\\('Arrow buttons'\\);const e=c.indexOf\\('Dots',s\\);console.log\\(c.slice\\(s-4,e-4\\).length, '|', JSON.stringify\\(c.slice\\(s-4,s+10\\)\\)\\)\")",
-      "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\satti.naveen\\\\\\\\\\\\\\\\costco-tyre-agent\\\\\\\\\\\\\\\\frontend\\\\\\\\\\\\\\\\src\\\\\\\\\\\\\\\\index.css','utf-8'\\);const s=c.indexOf\\('Arrow buttons'\\);console.log\\(s, JSON.stringify\\(c.slice\\(s,s+20\\)\\)\\)\")"
+      "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\satti.naveen\\\\\\\\\\\\\\\\costco-tyre-agent\\\\\\\\\\\\\\\\frontend\\\\\\\\\\\\\\\\src\\\\\\\\\\\\\\\\index.css','utf-8'\\);const s=c.indexOf\\('Arrow buttons'\\);console.log\\(s, JSON.stringify\\(c.slice\\(s,s+20\\)\\)\\)\")",
+      "Bash(wc -l app/data/*.json)",
+      "Read(//c/Users/satti.naveny/costco-tyre-agent/app/**)",
+      "Bash(costco-tyres/Scripts/python scripts/add_tyres_265_60R18.py)",
+      "Bash(costco-tyres/Scripts/python.exe scripts/add_tyres_265_60R18.py)",
+      "Bash(python -c \"import json; data=json.load\\(open\\('c:/Users/satti.naveen/costco-tyre-agent/app/data/locations.json', encoding='utf-8'\\)\\); print\\(repr\\(data[0]['name']\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\satti.naveen\\.claude\\projects\\c--Users-satti-naveen-costco-tyre-agent"

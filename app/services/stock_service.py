@@ -163,9 +163,11 @@ def get_stock_badge(tyre: Tyre, locations: list[dict]) -> str:
     if tyre.stock.qty == 0:
         return "Out of stock"
     loc_name = loc_map.get(tyre.stock.warehouse_id, tyre.stock.warehouse_id)
-    # Strip prefix robustly — handles any em-dash encoding variant
+    # Strip "Costco Tyre Centre — " prefix — handles em-dash, en-dash, hyphen, and
+    # any mojibake variants (e.g. â€" from double-encoded UTF-8)
     import re as _re
-    short_name = _re.split(r"Costco Tyre Centre\s*[—\-–]+\s*", loc_name, maxsplit=1)[-1].strip()
+    _parts = _re.split(r"Costco\s+Tyre\s+Centre\s*[-\u2013\u2014]+\s*", loc_name, maxsplit=1)
+    short_name = _parts[-1].strip() if len(_parts) > 1 else loc_name
     return f"In stock at {short_name}"
 
 

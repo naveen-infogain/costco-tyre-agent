@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react'
 import BotBubble from './messages/BotBubble'
 import UserBubble from './messages/UserBubble'
+import ImageBubble from './messages/ImageBubble'
 import TypingIndicator from './messages/TypingIndicator'
 import CardsGrid from './cards/CardsGrid'
 import SlotPicker from './cards/SlotPicker'
 import BookingCard from './cards/BookingCard'
+import DetailActions from './cards/DetailActions'
 import QuickReplies from './QuickReplies'
 import RecoveryBanner from './RecoveryBanner'
 
-export default function ChatFeed({ messages, isTyping, onSendMessage, onFeedback }) {
+export default function ChatFeed({ messages, isTyping, onSendMessage, onFeedback, onBackToRecs }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -19,6 +21,9 @@ export default function ChatFeed({ messages, isTyping, onSendMessage, onFeedback
     switch (msg.type) {
       case 'user':
         return <UserBubble key={msg.id} text={msg.text} />
+
+      case 'image':
+        return <ImageBubble key={msg.id} src={msg.src} name={msg.name} />
 
       case 'bot':
         return (
@@ -52,6 +57,17 @@ export default function ChatFeed({ messages, isTyping, onSendMessage, onFeedback
             replies={msg.replies}
             used={msg.used}
             onSend={onSendMessage}
+          />
+        )
+
+      case 'detail_actions':
+        return (
+          <DetailActions
+            key={msg.id}
+            tyreId={msg.tyreId}
+            slotTag={msg.slotTag}
+            onSendMessage={onSendMessage}
+            onBack={onBackToRecs}
           />
         )
 

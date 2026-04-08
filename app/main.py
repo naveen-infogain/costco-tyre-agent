@@ -151,6 +151,11 @@ class ChatRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     session_id: str
     signal: str
+
+class ImageAnalyseRequest(BaseModel):
+    session_id: str
+    image_data: str   # base64-encoded image bytes (no data URI prefix)
+    image_type: str   # e.g. "image/jpeg" | "image/png" | "image/webp"
     tyre_id: Optional[str] = None
     agent: str = "rec_ranking"
 
@@ -909,7 +914,7 @@ def _build_recommendation_cards(session: SessionState, user) -> list[dict]:
     from app.tools.recommendation_tools import generate_punch_line
 
     locs_path = Path(__file__).parent / "data" / "locations.json"
-    locs = json.loads(locs_path.read_text()) if locs_path.exists() else []
+    locs = json.loads(locs_path.read_text(encoding="utf-8")) if locs_path.exists() else []
     member_ctx = json.dumps({
         "driving_habits": user.driving_habits,
         "location": user.location.model_dump(),
@@ -1795,7 +1800,7 @@ async def chat(req: ChatRequest):
 
                 # Brand-diverse top 3
                 locs_path = Path(__file__).parent / "data" / "locations.json"
-                locs = json.loads(locs_path.read_text()) if locs_path.exists() else []
+                locs = json.loads(locs_path.read_text(encoding="utf-8")) if locs_path.exists() else []
                 from app.tools.content_tools import generate_personalised_msg
                 from app.tools.recommendation_tools import generate_punch_line
                 from app.services.stock_service import get_stock_badge
@@ -2050,12 +2055,17 @@ async def chat(req: ChatRequest):
                     readable_date = _d.strftime("%A, %B ") + str(_d.day)  # cross-platform, no leading zero
                 except ValueError:
                     readable_date = date_str
+                # Strip "Costco Tyre Centre — " prefix from location name
+                _raw_loc = loc.get("name", "Costco Tyre Centre")
+                _parts = re.split(r"Costco\s+Tyre\s+Centre\s*[-\u2013\u2014]+\s*", _raw_loc, maxsplit=1)
+                _short_loc = _parts[-1].strip() if len(_parts) > 1 else _raw_loc
+
                 booking_card = {
                     "booking_id":  booking["booking_id"],
                     "order_id":    session.order_id,
                     "date":        readable_date,
                     "time":        time_str,
-                    "location":    loc.get("name", "Costco Tyre Centre"),
+                    "location":    _short_loc,
                     "address":     loc.get("address", ""),
                     "tyre":        f"{tyre.brand} {tyre.model} x4" if tyre else "Tyres",
                     "bring":       ["Vehicle registration", "Costco membership card"],
@@ -2214,6 +2224,215 @@ async def feedback(req: FeedbackRequest):
            "appointment": "appointment", "orchestrator": "orchestrator"}.get(req.agent, "rec_ranking")
     updated = update_scorecard(key, delta)
     return {"status": "recorded", "updated_score": updated.get("score")}
+
+# ---------------------------------------------------------------------------
+# Image Analysis — tyre identification + tyre health scoring
+# ---------------------------------------------------------------------------
+
+@app.post("/image-analyse")
+async def image_analyse(req: ImageAnalyseRequest):
+    """
+    Analyse a tyre image using Claude Vision.
+
+    - Sidewall photo  → extracts tyre size + finds matching recommendations
+    - Tread/car photo → health score, wear analysis, buy recommendation
+
+    Returns same JSON format as /chat so the frontend processResponse() handles it.
+    """
+    from app.services.image_service import analyze_tyre_image, build_health_message
+    from app.services.profile_service import get_member
+    from app.services.stock_service import search_tyres, get_stock_badge
+    from app.tools.content_tools import generate_personalised_msg
+    from app.tools.recommendation_tools import generate_punch_line
+
+    session = get_session(req.session_id)
+    user = get_member(session.member_id) if session.member_id else None
+
+    result = analyze_tyre_image(req.image_data, req.image_type)
+    scenario = result.get("scenario", "unclear")
+
+    # ── Scenario: sidewall — identify tyre, run recommendations ─────────────
+    if scenario == "sidewall":
+        tyre_size  = result.get("tyre_size", "")
+        brand      = result.get("brand", "")
+        confidence = result.get("confidence", "medium")
+
+        if not tyre_size:
+            return JSONResponse({
+                "message": "I could see a tyre sidewall but couldn't read the size markings clearly. "
+                           "Please try a closer, well-lit photo of the numbers on the tyre side.",
+                "cards": [], "stage": session.stage, "quick_replies": [],
+                "comparison": None, "appointment_slots": [], "booking_card": None, "drop_recovery": None,
+            })
+
+        # Store detected size in session so subsequent flow uses it
+        session.preferences["override_tyre_size"] = tyre_size
+        if brand:
+            session.preferences["detected_brand"] = brand
+
+        conf_note = "" if confidence == "high" else " (please confirm this matches your tyre)"
+        # Only mention brand if Vision returned something real (not "Unknown" / empty)
+        brand_clean = brand if brand and brand.lower() not in ("unknown", "n/a", "none", "") else ""
+        intro = (
+            f"I can see from your image that your tyre size is **{tyre_size}**"
+            + (f" — {brand_clean} tyre" if brand_clean else "")
+            + f"{conf_note}. Here are the best options available for that size:"
+        )
+
+        # Find matching tyres (Top Pick + 2 alternatives)
+        locs_path = Path(__file__).parent / "data" / "locations.json"
+        locs = json.loads(locs_path.read_text(encoding="utf-8")) if locs_path.exists() else []
+
+        results = search_tyres(size=tyre_size, in_stock_only=True)
+        if len(results) < 3:
+            results += search_tyres(size=tyre_size, in_stock_only=False)
+        # De-duplicate
+        seen_ids: set[str] = set()
+        unique: list = []
+        for t in results:
+            if t.id not in seen_ids:
+                seen_ids.add(t.id)
+                unique.append(t)
+        results = unique[:6]  # cap to avoid over-processing
+
+        if not results:
+            # Same broadening logic as the chat flow — relax season, then size-only
+            from app.services.stock_service import broaden_search as _broaden
+            broadened = _broaden(size=tyre_size)
+            seen_ids2: set[str] = set()
+            broad_unique: list = []
+            for t in broadened:
+                if t.id not in seen_ids2:
+                    seen_ids2.add(t.id)
+                    broad_unique.append(t)
+            results = broad_unique[:6]
+
+            if not results:
+                # Truly nothing available — ask user to try manually
+                return JSONResponse({
+                    "message": (
+                        f"I detected tyre size **{tyre_size}** from your image, but we don't currently "
+                        f"carry that size. Please check back soon or try a nearby size."
+                    ),
+                    "cards": [], "stage": session.stage,
+                    "quick_replies": [
+                        {"label": "Search a different size", "message": "I want to search by tyre size"},
+                        {"label": "Find tyres for my car", "message": "Find tyres for my car"},
+                    ],
+                    "comparison": None, "appointment_slots": [], "booking_card": None, "drop_recovery": None,
+                })
+            # Broadened results found — note it in the intro
+            conf_note = "" if confidence == "high" else " (please confirm this matches your tyre)"
+            intro = (
+                f"We don't have an exact match for **{tyre_size}**, but here are the closest available options"
+                + f"{conf_note}:"
+            )
+
+        member_ctx = json.dumps({
+            "driving_habits": user.driving_habits if user else ["highway"],
+            "location": user.location.model_dump() if user else {"city": "Unknown", "zip": "00000"},
+            "membership_tier": user.membership_tier if user else "standard",
+            "vehicle": user.vehicle.model_dump() if user else {"make": "Unknown", "model": "Unknown", "year": 2020},
+        })
+
+        slot_defs = [
+            (results[0], "Top Pick",  "top_pick",  True),
+            (results[1], "Runner-up", "runner_up",  False),
+            (results[2] if len(results) > 2 else results[-1], "Budget Alt", "budget_alt", False),
+        ]
+
+        cards = []
+        for tyre, tag, slot_type, is_top in slot_defs:
+            msg_text = generate_personalised_msg.invoke({
+                "tyre_json": json.dumps(tyre.model_dump()),
+                "member_context_json": member_ctx,
+                "slot_type": slot_type,
+            })
+            punch = generate_punch_line.invoke({"tyre_json": json.dumps(tyre.model_dump())}) if is_top else None
+            cards.append({
+                "tyre": tyre.model_dump(),
+                "slot_tag": tag,
+                "personalised_msg": msg_text,
+                "stock_badge": get_stock_badge(tyre, locs),
+                "punch_line": punch,
+            })
+
+        session.stage = "browse"
+        session.preferences["last_cards_ids"] = [c["tyre"]["id"] for c in cards]
+
+        return JSONResponse({
+            "message": intro,
+            "cards": cards,
+            "stage": session.stage,
+            "quick_replies": [],
+            "comparison": None,
+            "appointment_slots": [],
+            "booking_card": None,
+            "drop_recovery": None,
+        })
+
+    # ── Scenario: tread or car — health analysis ─────────────────────────────
+    if scenario in ("tread", "car"):
+        health_msg        = build_health_message(result)
+        score             = result.get("health_score", 10)
+        rec               = result.get("recommendation", "continue")
+        needs_replacement = rec in ("replace_soon", "replace_now") or score < 4
+
+        if needs_replacement:
+            if user:
+                # Ask whether to use the member's existing car or a different one.
+                # These messages are phrased to match the /chat intent router so clicking
+                # either chip continues naturally through the recommendation flow.
+                v = user.vehicle
+                car_label = f"{v.year} {v.make} {v.model}"
+                follow_up = f"\nWould you like me to find replacement tyres for your {car_label}?"
+                quick_replies = [
+                    {"label": f"Yes, for my {car_label}",
+                     "message": f"Yes, same car — {v.year} {v.make} {v.model}"},
+                    {"label": "No, I drive a different car",
+                     "message": "No, I have a different vehicle"},
+                ]
+                # Set stage so /chat treats the next reply as a vehicle confirmation
+                session.stage = "confirm_vehicle"
+            else:
+                # Member not logged in — generic prompt to start the tyre search flow
+                follow_up = "\nWould you like me to find replacement tyres for you?"
+                quick_replies = [
+                    {"label": "Yes, find me tyres", "message": "Yes, find me tyres"},
+                    {"label": "No thanks",           "message": "No thanks"},
+                ]
+        else:
+            # Healthy tyres — no action needed, no chips shown
+            follow_up = ""
+            quick_replies = []
+
+        return JSONResponse({
+            "message": health_msg + follow_up,
+            "cards": [],
+            "stage": session.stage,
+            "quick_replies": quick_replies,
+            "comparison": None,
+            "appointment_slots": [],
+            "booking_card": None,
+            "drop_recovery": None,
+        })
+
+    # ── Scenario: unclear ────────────────────────────────────────────────────
+    msg = result.get("message", "I couldn't identify a tyre in that image.")
+    return JSONResponse({
+        "message": (
+            f"{msg}\n\nFor best results:\n"
+            "• Sidewall photo — photograph the side of the tyre showing the size numbers (e.g. 205/55R16)\n"
+            "• Tread photo — photograph the tyre contact surface from above"
+        ),
+        "cards": [], "stage": session.stage,
+        "quick_replies": [
+            {"label": "Enter tyre size manually",  "message": "I want to enter my tyre size manually"},
+            {"label": "Show all recommendations",  "message": "Show me tyre recommendations"},
+        ],
+        "comparison": None, "appointment_slots": [], "booking_card": None, "drop_recovery": None,
+    })
+
 
 # ---------------------------------------------------------------------------
 # Voice (ElevenLabs TTS)

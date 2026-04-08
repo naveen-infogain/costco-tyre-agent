@@ -16,16 +16,40 @@ AI-powered tyre purchasing assistant for Costco members. The system guides membe
 | LLM | `claude-sonnet-4-6` via `langchain-anthropic` |
 | Memory | `ConversationBufferWindowMemory` (10-turn window, per session) |
 | API | FastAPI + Uvicorn |
-| UI | Plain HTML/CSS/JS (single-page chat) |
+| UI | **React 18 + Vite** (port 5173) — separate `frontend/` folder |
+| Legacy UI | `app/static/index.html` — still served at GET / but superseded by React |
 | Mock Data | JSON files (tyres, users, locations, appointments) |
 | Calendar | `icalendar` (.ics generation) |
 
-### Dev Setup
+### Dev Setup — Both servers must run together
+
 ```bash
+# Terminal 1 — Backend
 cd costco-tyre-agent
 pip install -r requirements.txt
-cp .env.example .env          # add ANTHROPIC_API_KEY
+cp .env.example .env          # add ANTHROPIC_API_KEY (required)
+                              # add ELEVENLABS_API_KEY (optional — voice disabled if absent)
 uvicorn app.main:app --reload  # http://localhost:8000
+
+# Terminal 2 — Frontend
+cd costco-tyre-agent/frontend
+npm install
+npm run dev                    # http://localhost:5173
+```
+
+> **Always use the React frontend at `http://localhost:5173`.**
+> The Vite dev server proxies all `/chat`, `/feedback`, `/health`, `/demo-members`, `/voice`, `/dashboard` calls to FastAPI on port 8000 — no CORS config needed.
+
+### Environment Variables (`.env`)
+```
+ANTHROPIC_API_KEY=sk-ant-...       # Required — app will not start without it
+ELEVENLABS_API_KEY=...              # Optional — voice TTS disabled if absent
+APP_ENV=dev                         # dev | prod
+DB_HOST=localhost                   # Optional — falls back to JSON if DB unavailable
+DB_PORT=5432
+DB_NAME=costco_tyres
+DB_USER=postgres
+DB_PASSWORD=...
 ```
 
 ---
@@ -35,8 +59,8 @@ uvicorn app.main:app --reload  # http://localhost:8000
 ```
 costco-tyre-agent/
 ├── CLAUDE.md
-├── app/
-│   ├── main.py                        # FastAPI entry point
+├── app/                               # FastAPI backend (port 8000)
+│   ├── main.py                        # FastAPI entry point + intent router
 │   ├── agents/
 │   │   ├── orchestrator.py            # Orchestrator Agent
 │   │   ├── rec_ranking_agent.py       # Rec & Ranking Agent
@@ -46,7 +70,7 @@ costco-tyre-agent/
 │   │   └── guardrail_agent.py         # Guardrail Agent (wraps all responses)
 │   ├── services/
 │   │   ├── profile_service.py         # Profile Service
-│   │   ├── stock_service.py           # Stock Filter Service
+│   │   ├── stock_service.py           # Stock Filter Service (DB + JSON hybrid)
 │   │   ├── cart_service.py            # Cart Service
 │   │   ├── payment_service.py         # Payment Service
 │   │   ├── post_purchase_service.py   # Post-Purchase Service
@@ -59,24 +83,202 @@ costco-tyre-agent/
 │   │   ├── compare_tools.py
 │   │   ├── appointment_tools.py
 │   │   └── guardrail_tools.py
+│   ├── db/
+│   │   └── connection.py              # psycopg2 pool, db_available(), JSON fallback
 │   ├── dashboard/
 │   │   ├── dashboard.py               # FastAPI routes for /dashboard
 │   │   ├── analytics_store.py         # In-memory analytics aggregator
 │   │   └── static/
 │   │       └── dashboard.html         # Real-time dashboard UI
 │   ├── data/
-│   │   ├── tyres.json                 # Tyre catalogue (~30 entries)
-│   │   ├── users.json                 # Member profiles + order history
+│   │   ├── tyres.json                 # Tyre catalogue (100 entries incl. Indian market)
+│   │   ├── users.json                 # Member profiles + order history (50 members)
 │   │   ├── locations.json             # Costco tyre centre locations
 │   │   └── appointments.json          # Runtime booked appointments
 │   ├── models/
 │   │   └── schemas.py                 # Pydantic models
 │   ├── logs/                          # Structured JSON logs (guardrail, errors, events)
 │   └── static/
-│       └── index.html                 # Chat UI
+│       └── index.html                 # Legacy HTML chat UI (kept, served at GET /)
+├── scripts/
+│   ├── crm_to_json.py                 # CRM CSVs → tyres.json + users.json
+│   └── init_db.py                     # PostgreSQL schema + CRM data loader
+├── frontend/                          # React frontend (port 5173) ← PRIMARY UI
+│   ├── package.json                   # React 18, Vite, jsPDF
+│   ├── vite.config.js                 # Proxy /chat /feedback /health /voice /dashboard → :8000
+│   └── src/
+│       ├── App.jsx                    # Page router (signin → store → agent)
+│       ├── index.css                  # All styles: MD3 tokens + all component CSS
+│       ├── main.jsx
+│       ├── hooks/
+│       │   ├── useChat.js             # Session, sendMessage, processResponse, goBackToRecs
+│       │   └── useVoice.js            # ElevenLabs TTS + Web Speech API STT
+│       ├── pages/
+│       │   ├── SignInPage.jsx         # First screen — member ID login + demo chips
+│       │   ├── CostcoStorePage.jsx    # Costco store clone — browsing + Shop by Vehicle
+│       │   └── AgentPage.jsx          # TireAssist AI chat page
+│       └── components/
+│           ├── SharedHeader.jsx       # Common header for Store + Agent pages
+│           ├── ChatFeed.jsx           # Scrollable message feed (all message types)
+│           ├── ChatInput.jsx          # Textarea + mic + send pill
+│           ├── QuickReplies.jsx       # Quick reply chips (greyed after use)
+│           ├── RecoveryBanner.jsx     # Drop recovery banner
+│           └── cards/
+│               ├── TyreCard.jsx       # Individual tyre card (active/inactive state)
+│               ├── CardsGrid.jsx      # Cover-flow carousel of TyreCards
+│               ├── DetailActions.jsx  # Add to Cart + Back buttons after detail view
+│               ├── CompareCard.jsx    # Side-by-side comparison table
+│               ├── SlotPicker.jsx     # Appointment slot chips
+│               └── BookingCard.jsx    # Booking confirmation + jsPDF download
 ├── requirements.txt
 └── .env.example
 ```
+
+---
+
+## React Frontend Architecture
+
+The React app lives entirely in `frontend/`. It is **decoupled** from the backend — all it does is POST to `/chat` and `/feedback`, and render what the API returns.
+
+### Page Flow
+
+```
+SignInPage  →  CostcoStorePage  →  AgentPage
+   (default)       (after login)      (via toggle or Shop by Vehicle)
+```
+
+- `App.jsx` holds `page` state (`'signin' | 'store' | 'agent'`), `member` state (`{ id, name }`), and `initialVehicle` context.
+- `useChat()` is instantiated in `App.jsx` and passed as `chatState` prop to `AgentPage`, so the chat session persists when toggling between Store and Agent pages.
+
+### Pages
+
+**`SignInPage.jsx`**
+- Split panel: blue left (branding + member perks) / white right (form)
+- Input: member ID (format `M10001`–`M99999`)
+- On sign-in: POSTs member ID to `/chat`, extracts name from welcome message via regex, navigates to Store
+- Demo chips: loaded dynamically from `GET /demo-members`; fallback hardcoded list
+
+**`CostcoStorePage.jsx`**
+- Visual clone of tires.costco.com layout
+- Uses `SharedHeader` (with "Actual Site" toggle active)
+- "Shop by Vehicle" form (Year / Make / Model dropdowns) → navigates to AgentPage with vehicle context pre-filled as first message
+- Tyre category cards, featured tyre grid, brand strip — all static/mock data
+
+**`AgentPage.jsx`**
+- Dark background (`agent-bg`) + floating white card (`agent-card`, max-width 680px)
+- Uses `SharedHeader` (with "Agentic Agent" toggle active)
+- Title: "Meet TireAssist, Your AI Executive Assistant" — full 2-line on empty state, collapses to compact single line after first message
+- Wires `useVoice` for mic (STT) and TTS
+- `initialVehicle` sent via `useEffect` with 400ms delay + `vehicleSentRef` guard (prevents double-send)
+
+### SharedHeader (`components/SharedHeader.jsx`)
+- Shared by both Store and Agent pages
+- Left: Costco logo mark + "Costco Wholesale" wordmark
+- Center: Toggle pill — "Agentic Agent" | "Actual Site" (active = blue-purple gradient)
+- Center-right: Stage pill (agent page only, shows current conversation stage)
+- Right: Member avatar chip (initials + name + ID) + Cart button
+
+### Chat Hook (`hooks/useChat.js`)
+
+Key state and functions:
+- `messages` — array of typed messages rendered by `ChatFeed`
+- `stage` — current pipeline stage from backend response
+- `sendMessage(text)` — POSTs to `/chat`, calls `processResponse`, auto-injects `detail_actions` message after a details request
+- `goBackToRecs()` — re-appends the most recent `cards` message to the feed (used by Back button)
+- `sendFeedback(signal, tyreId, agent)` — POSTs to `/feedback`
+- `handleLoginResponse(data)` — called by App after sign-in to seed the first welcome message
+
+**Message types** handled by `ChatFeed`:
+| type | Component | Notes |
+|------|-----------|-------|
+| `bot` | `BotBubble` | Gray rounded bubble |
+| `user` | `UserBubble` | Blue-purple gradient bubble |
+| `cards` | `CardsGrid` | Cover-flow carousel |
+| `detail_actions` | `DetailActions` | Add to Cart + Back buttons |
+| `quickreplies` | `QuickReplies` | Chips, greyed after use |
+| `slots` | `SlotPicker` | Appointment slot chips |
+| `booking` | `BookingCard` | Confirmation + jsPDF download |
+| `recovery` | `RecoveryBanner` | Drop recovery prompt |
+
+### Tyre Recommendation Carousel (`components/cards/CardsGrid.jsx`)
+
+- **Cover-flow carousel** — no arrow buttons; click a side card to bring it to centre
+- `activeIdx` state (default `0` = Top Pick at centre)
+- `posClass(idx)` maps distance from activeIdx to CSS class:
+  - `cc-center` — hero card, full scale, drop-shadow
+  - `cc-left1` / `cc-right1` — adjacent cards, 86% scale, 72% opacity
+  - `cc-left2` / `cc-right2` — far cards, 72% scale, 38% opacity, pointer-events none
+- Dot indicators below for navigation
+- "Compare side by side" toggle below dots → shows `CompareCard`
+
+**`TyreCard.jsx`** — `active` prop:
+- `active=true` (centre card): shows Add to Cart, Details, thumbs up/down buttons
+- `active=false` (side cards): hides action buttons, shows "Tap to view" hint
+
+### Detail View Flow
+
+When user clicks "Details" on a card:
+1. `handleDetails(tyreId, slotTag)` in CardsGrid calls `onSendMessage("I'd like to view details for the {slotTag} option ({tyreId})")`
+2. `useChat.sendMessage` detects the details pattern via regex → sets `detailContextRef`
+3. Bot responds with detail text (rendered as `BotBubble`)
+4. `useChat` auto-injects a `detail_actions` message: `{ type: 'detail_actions', tyreId, slotTag }`
+5. `DetailActions` component renders two buttons:
+   - **Add to Cart** → `sendMessage("add to cart {tyreId}")`
+   - **Back to Recommendations** → `goBackToRecs()` re-appends the carousel
+
+### Voice (`hooks/useVoice.js`)
+
+- Checks `/voice/status` on mount — disables voice UI if `ELEVENLABS_API_KEY` not set
+- STT: Web Speech API (`SpeechRecognition`) — mic button toggles listening
+- TTS: POST to `/voice/tts` (ElevenLabs stream) — speaker button reads last bot response
+- Mic button shows disabled state if voice not available
+
+### CSS Architecture (`src/index.css`)
+
+Single file, organised by section with ASCII dividers:
+- MD3 design tokens (`:root` CSS variables — `--md-sys-color-*`, `--md-elevation-*`, `--md-sys-shape-*`)
+- Costco brand colours (`--cs-blue: #005CA9`, `--cs-red: #E31837`)
+- Sign-in page (`.signin-*`)
+- Store page (`.cs-*`)
+- Shared header (`.sh-*`)
+- Agent page (`.agent-*`, `.ta-*` for TireAssist components)
+- Tyre cards (`.tyre-card`, `.card-*`, `.slot-tag`, `.price-row`, etc.)
+- Carousel (`.cc-*`)
+- Detail actions (`.detail-actions`)
+- Compare card (`.compare-*`)
+- Booking card, slot picker, recovery banner
+
+---
+
+## Pending Tasks for Next Developer
+
+### Task 5 — Voice Integration End-to-End
+- `useVoice.js` hook is fully wired; only needs `ELEVENLABS_API_KEY` in `.env`
+- Test: mic button → speech → `sendMessage` → bot response → TTS reads it aloud
+- ElevenLabs voice ID configured via `ELEVENLABS_VOICE_ID` env var
+
+### Task 6 — Checkout & Payment Flow (UI side)
+- "Add to Cart" currently sends `add to cart {tyreId}` as a chat message
+- The backend cart/payment pipeline already handles this
+- **TODO:** Build a proper cart drawer/page in React:
+  - Show cart items, quantity, member pricing, savings
+  - Costco Visa auto-detect + cashback display
+  - Confirm order → triggers appointment booking flow
+
+### Task 7 — Appointment Booking UI Polish
+- `SlotPicker.jsx` renders appointment slots as chips — works but basic
+- **TODO:** Calendar-style slot picker (date tabs + time grid)
+- Show predicted wait time per slot (from `predict_wait_times` backend)
+- After booking: `BookingCard` shows confirmation + `.ics` download
+
+### Task 8 — Mobile Responsive Polish
+- Breakpoints exist at 768px in CSS
+- **TODO:** Test on mobile viewport, especially the carousel (may need swipe gesture support)
+- Swipe on `cc-wrapper` → advance `activeIdx` (use `onTouchStart`/`onTouchEnd` in CardsGrid)
+
+### Task 9 — Dashboard Integration
+- `GET /dashboard` serves `app/dashboard/static/dashboard.html` (plain HTML, existing)
+- **TODO:** Optionally embed or link dashboard from SharedHeader or a new "Admin" page in React
 
 ---
 

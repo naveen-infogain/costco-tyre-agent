@@ -2,8 +2,24 @@ import { useState } from 'react'
 import TyreCard from './TyreCard'
 import CompareCard from './CompareCard'
 
+// Reorder cards: Runner-up first, Top Pick at centre (index 1), rest after
+function reorderCards(cards) {
+  if (!cards || cards.length < 2) return cards || []
+  const topPickTags = ['Top Pick', 'Best Repurchase']
+  const topIdx = cards.findIndex(c => topPickTags.includes(c.slot_tag))
+  if (topIdx <= 0) {
+    // Top Pick already at 0 — move it to index 1, shift others left
+    const reordered = [...cards]
+    const [top] = reordered.splice(0, 1)
+    reordered.splice(1, 0, top)
+    return reordered
+  }
+  return cards
+}
+
 export default function CardsGrid({ cards, onSendMessage, onFeedback }) {
-  const [activeIdx, setActiveIdx] = useState(0)
+  const orderedCards = reorderCards(cards)
+  const [activeIdx, setActiveIdx] = useState(1) // Top Pick starts at centre
   const [showCompare, setShowCompare] = useState(false)
 
   function handleAddToCart(tyreId, slotTag) {
@@ -16,9 +32,12 @@ export default function CardsGrid({ cards, onSendMessage, onFeedback }) {
     onFeedback(signal, tyreId, 'rec_ranking')
   }
 
-  // Returns CSS class based on distance from active index
+  // Circular distance — wraps so carousel is infinite
   function posClass(idx) {
-    const d = idx - activeIdx
+    const n = orderedCards.length
+    let d = idx - activeIdx
+    if (d > Math.floor(n / 2))  d -= n
+    if (d < -Math.floor(n / 2)) d += n
     if (d === 0)  return 'cc-center'
     if (d === -1) return 'cc-left1'
     if (d === 1)  return 'cc-right1'
@@ -26,14 +45,21 @@ export default function CardsGrid({ cards, onSendMessage, onFeedback }) {
     return 'cc-right2'
   }
 
+  function prev() {
+    setActiveIdx(i => (i - 1 + orderedCards.length) % orderedCards.length)
+  }
+  function next() {
+    setActiveIdx(i => (i + 1) % orderedCards.length)
+  }
+
   return (
     <div className="full-width">
       <div className="section-label">Your Recommendations</div>
 
-      {/* Carousel — no arrows, Top Pick stays center by default */}
+      {/* Carousel — click a side card to bring it to centre */}
       <div className="cc-wrapper">
         <div className="cc-track">
-          {cards.map((card, idx) => (
+          {orderedCards.map((card, idx) => (
             <div
               key={card.tyre?.id || idx}
               className={`cc-card ${posClass(idx)}`}
@@ -53,9 +79,9 @@ export default function CardsGrid({ cards, onSendMessage, onFeedback }) {
         </div>
       </div>
 
-      {/* Dots */}
+      {/* Dots — tap to navigate */}
       <div className="cc-dots">
-        {cards.map((_, idx) => (
+        {orderedCards.map((_, idx) => (
           <button
             key={idx}
             className={`cc-dot${idx === activeIdx ? ' active' : ''}`}
@@ -65,7 +91,7 @@ export default function CardsGrid({ cards, onSendMessage, onFeedback }) {
       </div>
 
       {/* Compare toggle */}
-      {cards.length >= 2 && (
+      {orderedCards.length >= 2 && (
         <div className="compare-toggle-row">
           <button className="btn-compare" onClick={() => setShowCompare(v => !v)}>
             <span className="material-symbols-rounded">
@@ -75,7 +101,7 @@ export default function CardsGrid({ cards, onSendMessage, onFeedback }) {
           </button>
         </div>
       )}
-      {showCompare && <CompareCard cards={cards} />}
+      {showCompare && <CompareCard cards={orderedCards} />}
     </div>
   )
 }

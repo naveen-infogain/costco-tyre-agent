@@ -3,6 +3,7 @@ import { useChat } from './hooks/useChat'
 import SignInPage from './pages/SignInPage'
 import CostcoStorePage from './pages/CostcoStorePage'
 import AgentPage from './pages/AgentPage'
+import DashboardPage from './pages/DashboardPage'
 
 export default function App() {
   const [page, setPage] = useState('signin')
@@ -11,7 +12,6 @@ export default function App() {
   const chatState = useChat()
 
   function handleSignInSuccess({ memberId, ...data }) {
-    // Extract first name from welcome message e.g. "Hey Sarah," or "Hello Peter,"
     const nameMatch = data.message?.match(/(?:hey|hello|hi)[,\s]+([A-Z][a-z]+)/i)
     const name = nameMatch?.[1] || memberId
     setMember({ id: memberId, name })
@@ -29,6 +29,10 @@ export default function App() {
     setPage('store')
   }
 
+  function switchToDashboard() {
+    setPage('dashboard')
+  }
+
   if (page === 'signin') {
     return (
       <SignInPage
@@ -44,6 +48,18 @@ export default function App() {
         member={member}
         onSwitchToAgent={switchToAgent}
         onSwitchToStore={switchToStore}
+        onSwitchToDashboard={switchToDashboard}
+      />
+    )
+  }
+
+  if (page === 'dashboard') {
+    return (
+      <DashboardPage
+        member={member}
+        onSwitchToAgent={switchToAgent}
+        onSwitchToStore={switchToStore}
+        onSwitchToDashboard={switchToDashboard}
       />
     )
   }
@@ -53,6 +69,7 @@ export default function App() {
       member={member}
       onSwitchToStore={switchToStore}
       onSwitchToAgent={switchToAgent}
+      onSwitchToDashboard={switchToDashboard}
       initialVehicle={initialVehicle}
       chatState={chatState}
     />

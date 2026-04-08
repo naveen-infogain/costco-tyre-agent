@@ -349,7 +349,7 @@ function StoreFooter() {
 }
 
 /* ── Main page ────────────────────────────────────────────────────────── */
-export default function CostcoStorePage({ member, onSwitchToAgent, onSwitchToStore }) {
+export default function CostcoStorePage({ member, onSwitchToAgent, onSwitchToStore, onSwitchToDashboard }) {
   const [year, setYear]   = useState('')
   const [make, setMake]   = useState('')
   const [model, setModel] = useState('')
@@ -366,6 +366,7 @@ export default function CostcoStorePage({ member, onSwitchToAgent, onSwitchToSto
         member={member}
         onSwitchToAgent={() => onSwitchToAgent(null)}
         onSwitchToStore={onSwitchToStore}
+        onSwitchToDashboard={onSwitchToDashboard}
       />
       <StoreNav />
       <HeroBanner

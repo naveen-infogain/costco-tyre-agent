@@ -3,6 +3,9 @@ import { useState } from 'react'
 export default function BotBubble({ text, onFeedback }) {
   const [voted, setVoted] = useState(null)
 
+  // Don't render empty bubbles
+  if (!text?.trim()) return null
+
   function vote(v) {
     setVoted(v)
     onFeedback(v === 'up' ? 'thumbs_up' : 'thumbs_down')

@@ -1,2 +1,20 @@
 # CRM source data — sensitive, excluded from Claude Code context
 crm_data/
+
+# Python virtual environment
+costco-tyres/
+
+# Node modules
+frontend/node_modules/
+node_modules/
+
+# Build output
+frontend/dist/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime logs (noisy, auto-generated)
+app/logs/

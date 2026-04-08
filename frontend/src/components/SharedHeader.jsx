@@ -1,4 +1,4 @@
-export default function SharedHeader({ activePage, member, onSwitchToAgent, onSwitchToStore, stage }) {
+export default function SharedHeader({ activePage, member, onSwitchToAgent, onSwitchToStore, onSwitchToDashboard, stage }) {
   const initials = member?.name
     ? member.name.slice(0, 2).toUpperCase()
     : '?'
@@ -48,8 +48,21 @@ export default function SharedHeader({ activePage, member, onSwitchToAgent, onSw
         <div className="sh-stage-pill">{stage}</div>
       )}
 
-      {/* ── Right: member chip + cart ─────────────────────────────── */}
+      {/* ── Right: dashboard + member chip + cart ────────────────── */}
       <div className="sh-right">
+
+        {/* Dashboard icon button */}
+        {onSwitchToDashboard && (
+          <button
+            className={`sh-dashboard-btn${activePage === 'dashboard' ? ' active' : ''}`}
+            onClick={onSwitchToDashboard}
+            title="Live Dashboard"
+          >
+            <span className="material-symbols-rounded" style={{ fontSize: 18 }}>analytics</span>
+            Dashboard
+          </button>
+        )}
+
         <div className="sh-member-chip">
           <div className="sh-member-avatar">{initials}</div>
           <div className="sh-member-info">

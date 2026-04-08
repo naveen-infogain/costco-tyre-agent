@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import CustomSlotModal from './CustomSlotModal'
 
 export default function SlotPicker({ slots, onSendMessage }) {
   const [bookedIdx, setBookedIdx] = useState(null)
+  const [showCustom, setShowCustom] = useState(false)
 
   const available = (slots || []).filter(s => s.available !== false).slice(0, 6)
 
@@ -11,10 +13,17 @@ export default function SlotPicker({ slots, onSendMessage }) {
     onSendMessage(`Book the slot on ${slot.date} at ${slot.time} (location ${slot.location_id})`)
   }
 
+  function handleCustomConfirm(isoDate, time24) {
+    setShowCustom(false)
+    // Same format as regular slot chips — backend regex: YYYY-MM-DD + HH:MM
+    onSendMessage(`Book the slot on ${isoDate} at ${time24}`)
+  }
+
   return (
     <div className="full-width">
       <div className="section-label">Suggested Slots for Your Schedule</div>
       <div className="slots-grid">
+
         {available.map((slot, idx) => {
           const d = new Date(slot.date + 'T00:00:00')
           const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -34,7 +43,25 @@ export default function SlotPicker({ slots, onSendMessage }) {
             </div>
           )
         })}
+
+        {/* Custom time card */}
+        <div
+          className={`slot-chip slot-chip-custom${bookedIdx !== null ? ' booked-other' : ''}`}
+          onClick={() => bookedIdx === null && setShowCustom(true)}
+        >
+          <span className="material-symbols-rounded slot-custom-icon">edit_calendar</span>
+          <div className="slot-date">Custom</div>
+          <div className="slot-custom-label">Pick date & time</div>
+        </div>
+
       </div>
+
+      {showCustom && (
+        <CustomSlotModal
+          onConfirm={handleCustomConfirm}
+          onClose={() => setShowCustom(false)}
+        />
+      )}
     </div>
   )
 }

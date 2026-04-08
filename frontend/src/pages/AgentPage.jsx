@@ -4,10 +4,10 @@ import SharedHeader from '../components/SharedHeader'
 import ChatFeed from '../components/ChatFeed'
 import ChatInput from '../components/ChatInput'
 
-export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, initialVehicle, chatState }) {
+export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, onSwitchToDashboard, initialVehicle, chatState }) {
   const {
     sessionId, messages, stage, isTyping,
-    lastBotText, sendMessage, sendFeedback,
+    lastBotText, sendMessage, sendImage, sendFeedback, goBackToRecs,
   } = chatState
 
   const { voiceEnabled, isListening, isTtsPlaying, toggleMic, speakLastResponse } =
@@ -30,6 +30,7 @@ export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, in
         member={member}
         onSwitchToAgent={onSwitchToAgent}
         onSwitchToStore={onSwitchToStore}
+        onSwitchToDashboard={onSwitchToDashboard}
       />
 
       <div className="agent-bg">
@@ -51,11 +52,13 @@ export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, in
             isTyping={isTyping}
             onSendMessage={sendMessage}
             onFeedback={sendFeedback}
+            onBackToRecs={goBackToRecs}
           />
 
           {/* Input */}
           <ChatInput
             onSend={sendMessage}
+            onSendImage={sendImage}
             isTyping={isTyping}
             voiceEnabled={voiceEnabled}
             isListening={isListening}

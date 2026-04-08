@@ -1,7 +1,8 @@
 import { useRef } from 'react'
 
-export default function ChatInput({ onSend, isTyping, voiceEnabled, isListening, isTtsPlaying, onToggleMic, onTts }) {
+export default function ChatInput({ onSend, onSendImage, isTyping, voiceEnabled, isListening, isTtsPlaying, onToggleMic, onTts }) {
   const textareaRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -25,8 +26,22 @@ export default function ChatInput({ onSend, isTyping, voiceEnabled, isListening,
     onSend(val)
   }
 
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (file) onSendImage(file)
+    e.target.value = ''   // reset so same file can be re-selected
+  }
+
   return (
     <div className="ta-input-bar">
+      {/* Hidden file input for image uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
       <textarea
         ref={textareaRef}
         className="ta-input-textarea"
@@ -39,8 +54,16 @@ export default function ChatInput({ onSend, isTyping, voiceEnabled, isListening,
         disabled={isTyping}
       />
 
-      {/* Action pill — attach + mic + send */}
+      {/* Action pill — image + mic + send */}
       <div className="ta-input-pill">
+        <button
+          className="ta-pill-btn ta-pill-image"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isTyping}
+          title="Upload tyre image for analysis"
+        >
+          <span className="material-symbols-rounded">image_search</span>
+        </button>
         {voiceEnabled && isTtsPlaying && (
           <button className="ta-pill-btn" onClick={onTts} title="Stop reading">
             <span className="material-symbols-rounded">stop_circle</span>
