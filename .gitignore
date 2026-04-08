@@ -57,3 +57,7 @@ htmlcov/
 # ── Type checking / linting ────────────────────────────────────────────────
 .mypy_cache/
 .ruff_cache/
+
+
+node_modules/
+dist/

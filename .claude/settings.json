@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(where python:*)"
+      "Bash(where python:*)",
+      "Bash(npm --version)",
+      "Bash(cmd /c \"node --version\")",
+      "Bash(Get-Content \"c:\\\\Users\\\\satti.naveen\\\\costco-tyre-agent\\\\app\\\\static\\\\index.html\")",
+      "Bash(Measure-Object -Line)",
+      "WebFetch(domain:tires.costco.com)",
+      "Bash(curl -s -L \"https://tires.costco.com/\" --max-time 10)",
+      "Bash(wget -q -O - \"https://tires.costco.com/\" --timeout=10)",
+      "WebSearch",
+      "WebFetch(domain:www.costco.com)",
+      "Bash(python3 -c ':*)",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('c:/Users/satti.naveen/costco-tyre-agent/frontend/src/index.css','utf-8'\\);const s=c.indexOf\\('Arrow buttons'\\);const e=c.indexOf\\('Dots',s\\);console.log\\(c.slice\\(s-4,e-4\\).length, '|', JSON.stringify\\(c.slice\\(s-4,s+10\\)\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const c=fs.readFileSync\\('C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\satti.naveen\\\\\\\\\\\\\\\\costco-tyre-agent\\\\\\\\\\\\\\\\frontend\\\\\\\\\\\\\\\\src\\\\\\\\\\\\\\\\index.css','utf-8'\\);const s=c.indexOf\\('Arrow buttons'\\);console.log\\(s, JSON.stringify\\(c.slice\\(s,s+20\\)\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\satti.naveen\\.claude\\projects\\c--Users-satti-naveen-costco-tyre-agent"
