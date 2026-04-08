@@ -461,6 +461,58 @@ _CLASS_KEYWORDS = {
     "compact":     ["compact", "hatch", "hatchback", "fit", "yaris", "fiesta", "spark", "accent", "rio", "swift", "baleno", "i20", "altroz", "tiago", "punch", "celerio", "ignis", "glanza"],
 }
 
+# ---------------------------------------------------------------------------
+# Model-name → make lookup (for multilingual messages where only model is said)
+# e.g. "nexon per jata hun" → make=Tata, model=Nexon
+# ---------------------------------------------------------------------------
+_KNOWN_MODEL_MAKES: dict[str, str] = {
+    # Tata
+    "nexon": "Tata", "punch": "Tata", "harrier": "Tata", "safari": "Tata",
+    "altroz": "Tata", "curvv": "Tata", "tigor": "Tata", "tiago": "Tata",
+    # Mahindra
+    "scorpio": "Mahindra", "thar": "Mahindra", "xuv700": "Mahindra",
+    "xuv300": "Mahindra", "xuv400": "Mahindra", "bolero": "Mahindra",
+    "3xo": "Mahindra",
+    # Hyundai
+    "creta": "Hyundai", "venue": "Hyundai", "i20": "Hyundai", "verna": "Hyundai",
+    "alcazar": "Hyundai", "exter": "Hyundai", "tucson": "Hyundai",
+    # Kia
+    "sonet": "Kia", "seltos": "Kia", "carens": "Kia",
+    # Maruti Suzuki
+    "swift": "Maruti Suzuki", "baleno": "Maruti Suzuki", "brezza": "Maruti Suzuki",
+    "ertiga": "Maruti Suzuki", "fronx": "Maruti Suzuki", "ignis": "Maruti Suzuki",
+    "wagonr": "Maruti Suzuki", "wagon r": "Maruti Suzuki",
+    "grand vitara": "Maruti Suzuki", "vitara": "Maruti Suzuki",
+    # Honda
+    "city": "Honda", "amaze": "Honda", "elevate": "Honda",
+    "cr-v": "Honda", "crv": "Honda", "civic": "Honda",
+    # Toyota
+    "innova": "Toyota", "fortuner": "Toyota", "camry": "Toyota",
+    "corolla": "Toyota", "hyryder": "Toyota", "urban cruiser": "Toyota",
+    # MG
+    "hector": "MG", "astor": "MG", "gloster": "MG", "comet": "MG",
+    # Skoda
+    "slavia": "Skoda", "kushaq": "Skoda", "octavia": "Skoda", "superb": "Skoda",
+    # Renault
+    "kwid": "Renault", "kiger": "Renault", "triber": "Renault",
+    # Volkswagen
+    "taigun": "Volkswagen", "virtus": "Volkswagen", "polo": "Volkswagen",
+    # Nissan
+    "magnite": "Nissan",
+}
+
+# Compiled regex matching any known model name — used in multilingual intent detection.
+# Sorted longest-first so "grand vitara" matches before "grand" etc.
+_MODEL_NAMES_RE = re.compile(
+    r"(?<![a-z])(" + "|".join(
+        re.escape(k) for k in sorted(
+            (k for k in _VEHICLE_SIZE_MAP if not k[0].isdigit() and len(k) >= 3),
+            key=len, reverse=True,
+        )
+    ) + r")(?![a-z])",
+    re.IGNORECASE,
+)
+
 
 def _infer_size(vehicle) -> Optional[str]:
     """Look up OEM tyre size from vehicle model name, with class-based fallback."""
@@ -583,10 +635,12 @@ _LANG_MARKERS: dict[str, set[str]] = {
         "nako", "hote", "aala",
     },
     "Hindi": {
-        "yaar", "bhai", "haan", "nahi", "kya", "acha", "accha", "theek",
-        "bolo", "karo", "leke", "gaadi", "chalte", "jaana", "milega",
+        "yaar", "bhai", "haan", "nahi", "nahin", "kya", "acha", "accha", "theek",
+        "bolo", "karo", "leke", "lekar", "gaadi", "chalte", "jaana", "milega",
         "arre", "arrey", "abhi", "bas", "ekdum", "bilkul", "sahi",
         "dekho", "bata", "kaafi", "thoda", "jaldi", "suno", "chal", "chalo",
+        "jata", "jati", "jaunga", "jayenge", "hun", "hoon", "raha", "rahi",
+        "wala", "wali", "mujhe", "humko", "aapko", "tyre", "chahiye",
     },
 }
 
@@ -608,9 +662,11 @@ _MORPH_PATTERNS: list[tuple[str, str]] = [
     ("Kannada",  r"\w{3,}(enu\b|iru\b|ide\b|alli\b|iinda)\b"),
     # Malayalam verb suffixes: -unnu, -um, -aan, -aal
     ("Malayalam",r"\w{4,}(unnu|unu\b|aan\b|aal\b)\b"),
-    # Hindi verb patterns: raha/rahi + hu/hoon
+    # Hindi verb patterns: raha/rahi + hu/hoon, jata/jati + hun, lekar/leke
     ("Hindi",    r"\b(ja|aa|kar|de|le|ho)\s+(raha|rahi)\s+(hu|hoon|hai)\b"),
     ("Hindi",    r"\b(raha|rahi)\s+(hu|hoon)\b"),
+    ("Hindi",    r"\b(jata|jati|jaata|jaati)\s+(hun|hoon|hai)\b"),
+    ("Hindi",    r"\b(le|leke|lekar)\s+\w+"),
 ]
 
 
@@ -1182,6 +1238,24 @@ def _detect_intent(msg: str, session: SessionState) -> str:
     if re.search(r"\bcancel\b|\bgo back\b|\bstart over\b|\brestart\b", m):
         return "cancel"
 
+    # ── Tier 1.5 — Multilingual vehicle detection (global, pre-cart stages only) ──
+    # If a known car brand or model name appears in the message, and we are not
+    # deep into checkout, treat it as a vehicle specification regardless of
+    # language context (English, Hindi, Telugu, Tamil, Kannada, etc.).
+    _VEHICLE_STAGES = {"confirm_vehicle", "collect_vehicle", "browse", "greet", None, ""}
+    if session.stage in _VEHICLE_STAGES:
+        if re.search(r"\d{3}/\d{2}R\d{2}", msg, re.IGNORECASE):
+            return "new_vehicle_detail"
+        if re.search(
+            r"\b(honda|toyota|ford|bmw|mercedes|audi|kia|hyundai|nissan|chevrolet|"
+            r"subaru|mazda|volkswagen|maruti|suzuki|tata|mahindra|mg|skoda|renault|"
+            r"citroen|isuzu|jeep|dodge|tesla|lexus|acura|infiniti)\b",
+            m,
+        ):
+            return "new_vehicle_detail"
+        if _MODEL_NAMES_RE.search(m):
+            return "new_vehicle_detail"
+
     # ── Tier 2 — Stage-sensitive rules ───────────────────────────────────────
     # Context matters here — same word means different things in different stages.
 
@@ -1214,28 +1288,41 @@ def _detect_intent(msg: str, session: SessionState) -> str:
         if re.search(r"\bmy (?!bad\b|mistake\b|oops\b|fault\b)\w+", m):
             return "same_vehicle"
 
-        # ── CAR BRAND / TYRE SIZE — check FIRST so "going to Bombay with Tata Nexon"
-        # is treated as new_vehicle_detail, not destination context.
+        # ── CAR BRAND / MODEL / TYRE SIZE — check FIRST so multilingual messages
+        # like "Nahin main Kerala nexon per jata hun" are caught before destination context.
         if re.search(r"\d{3}/\d{2}R\d{2}", msg, re.IGNORECASE):
             return "new_vehicle_detail"
         if re.search(r"\b(honda|toyota|ford|bmw|mercedes|audi|kia|hyundai|nissan|chevrolet|"
                      r"subaru|mazda|volkswagen|maruti|tata|mahindra|mg|skoda|renault)\b", m):
             return "new_vehicle_detail"
-        # Different vehicle signals
-        if re.search(r"\bnew\b|^no\b|differ|just got|bought|have a|got a|switched|changed", m):
+        # Model name only (no brand) — covers "nexon", "creta", "swift" in any language context
+        if _MODEL_NAMES_RE.search(m):
+            return "new_vehicle_detail"
+        # Different vehicle signals — includes Hindi negation "nahin/nahi"
+        if re.search(
+            r"\bnew\b|^no\b|differ|just got|bought|have a|got a|switched|changed|"
+            r"\bnahin\b|\bnahi\b|\bnope\b|\balag\b|\bdusri\b|\bdusra\b",
+            m,
+        ):
             return "new_vehicle"
-        # ── TRIP / DESTINATION CONTEXT — only when no car brand detected above
-        # Includes Hindi travel phrases and major Indian city names.
+        # ── TRIP / DESTINATION CONTEXT — only when no car brand/model detected above
+        # Includes Hindi travel phrases, Indian cities, and Indian states.
         if re.search(
             r"road trip|long drive|travel|journey|trip to|going to|heading to|"
             r"off.road|highway|monsoon|\brain\b|winter|city driv|daily|"
-            # Hindi travel phrases
+            # Hindi / Hinglish travel phrases
             r"ja raha|ja rahi|jaana|safar|nikal raha|nikal rahi|chal raha|jaa raha|"
-            # Major Indian cities — any mention = destination context
+            r"jata hun|jati hun|jaunga|jayenge|nikalna|travel kar|drive kar|"
+            # Major Indian cities
             r"\bmumbai\b|\bbombay\b|\bdelhi\b|\bbangalore\b|\bbengaluru\b|\bchennai\b|"
             r"\bhyderabad\b|\bpune\b|\bkolkata\b|\bjaipur\b|\bahmedabad\b|"
             r"\bsurat\b|\bchandigarh\b|\bindore\b|\bnagpur\b|\blucknow\b|"
-            r"\bgoa\b|\bkochi\b|\bvishakapatnam\b|\bvizag\b",
+            r"\bgoa\b|\bkochi\b|\bvishakapatnam\b|\bvizag\b|"
+            # Indian states — destination context
+            r"\bkerala\b|\bgujarat\b|\brajasthan\b|\bmaharashtra\b|\bkarnataka\b|"
+            r"\btamil\s*nadu\b|\bandhra\b|\btelangana\b|\bpunjab\b|\bharyana\b|"
+            r"\bup\b|\buttar\s*pradesh\b|\bmp\b|\bmadya\s*pradesh\b|\bassam\b|"
+            r"\bwest\s*bengal\b|\bodisha\b|\bjharkhand\b|\bchhattisgarh\b",
             m
         ):
             return "context_then_vehicle"
@@ -1300,6 +1387,9 @@ def _llm_classify_intent(msg: str, session: SessionState) -> str:
         f"You are an intent classifier for a tyre shopping assistant. "
         f"Current conversation stage: '{stage}'. "
         f"Classify the user message into EXACTLY ONE of these labels: {_INTENT_OPTIONS}. "
+        f"IMPORTANT: If the message mentions a car brand or model (e.g. Tata Nexon, Creta, Swift, "
+        f"Honda City) in ANY language (Hindi, Telugu, Tamil, Kannada, Hinglish, etc.), "
+        f"classify as 'new_vehicle_detail'. "
         f"Reply with the label only — no explanation, no punctuation."
     )
     try:
@@ -1349,25 +1439,60 @@ def _parse_vehicle_from_msg(msg: str) -> Optional[dict]:
     }
     m = msg.lower()
     make = None
+    make_key_found = None
     for key, canonical in makes.items():
-        if key in m:
+        if re.search(r"(?<![a-z])" + re.escape(key) + r"(?![a-z])", m):
             make = canonical
+            make_key_found = key
             break
-    if not make:
-        return None
 
     # Extract year (4-digit number between 2000–2030)
     year_match = re.search(r"\b(20[0-2]\d)\b", msg)
     year = int(year_match.group(1)) if year_match else None
 
-    # Extract model — words after the make name, before the year
-    make_pos = m.find(make.lower().split()[0])
-    after_make = msg[make_pos + len(make):].strip()
-    # Remove year from model string
-    model_raw = re.sub(r"\b20[0-2]\d\b", "", after_make).strip(" -,.")
-    model = model_raw.split(",")[0].strip() if model_raw else "Unknown"
+    if make and make_key_found:
+        # Extract model — words after the make name, before the year
+        make_pos = m.find(make_key_found)
+        after_make = msg[make_pos + len(make_key_found):].strip()
+        # Remove year from model string
+        model_raw = re.sub(r"\b20[0-2]\d\b", "", after_make).strip(" -,.")
+        # Truncate at the first filler word — handles multilingual context like
+        # "nexon kosam choosthunanu" → stop at "kosam" → "nexon"
+        # "nexon lo velthanu" → stop at "lo" → "nexon"
+        _MULTILANG_FILLERS = re.compile(
+            r"\b(kosam|kosamu|lo\b|ki\b|tho\b|toh\b|loki|nunchi|velthanu|"
+            r"choosthunanu|veltunna|chestunanu|"          # Telugu
+            r"mein|se\b|ko\b|ka\b|ke\b|per\b|par\b|leke|lekar|wala|wali|"
+            r"hai\b|hun\b|hoon\b|jata|jati|jaunga|jayenge|"  # Hindi
+            r"\bon\b|\bin\b|\bwith\b|\bfor\b|\bthe\b|\ban\b|\bmy\b|"
+            r"\bgoing\b|\bheading\b|\btravelling\b|\bdriving\b)\b",
+            re.IGNORECASE,
+        )
+        filler_match = _MULTILANG_FILLERS.search(model_raw)
+        if filler_match:
+            model_raw = model_raw[:filler_match.start()].strip(" -,.")
+        model = model_raw.split(",")[0].strip() if model_raw else "Unknown"
+        # Validate: if model is empty or looks like a sentence, use model-name regex fallback
+        if not model or len(model.split()) > 3:
+            model_m = _MODEL_NAMES_RE.search(msg)
+            if model_m:
+                model = model_m.group(1).title()
+        return {"make": make, "model": model or "Unknown", "year": year}
 
-    return {"make": make, "model": model or "Unknown", "year": year}
+    # ── Model-only fallback: "nexon per jata hun", "my creta", "in seltos" ──
+    # Handles multilingual messages where the make brand is omitted.
+    model_match = _MODEL_NAMES_RE.search(m)
+    if model_match:
+        found_model = model_match.group(1).lower()
+        inferred_make = _KNOWN_MODEL_MAKES.get(found_model)
+        if inferred_make:
+            return {
+                "make": inferred_make,
+                "model": found_model.title(),
+                "year": year,
+            }
+
+    return None
 
 
 def _extract_tyre_id_from_msg(msg: str, session: SessionState) -> Optional[str]:
@@ -1668,8 +1793,12 @@ async def chat(req: ChatRequest):
     # ── STAGE: collect tyre size or car make → build Path B cards ─────────
     # Primary: tyre size (e.g. 235/65R17) — used directly for search
     # Fallback: car make/model → infer size from _VEHICLE_SIZE_MAP
-    elif intent == "new_vehicle_detail" and session.stage in ("collect_vehicle", "confirm_vehicle"):
+    # Fires from confirm_vehicle, collect_vehicle, browse, or greet — any pre-cart stage.
+    elif intent == "new_vehicle_detail" and session.stage not in ("cart", "pay", "book", "complete"):
         session.stage = "collect_vehicle"  # normalise so rest of handler works
+        # Build language instruction once — used in every LLM call in this handler
+        _lang = session.preferences.get("language", "English")
+        _lang_instr = _LANG_INSTRUCTION.get(_lang, "")
         user = get_member(session.member_id)
 
         # Safety guard: if the message looks like a same-vehicle confirmation in any
@@ -1724,7 +1853,7 @@ async def chat(req: ChatRequest):
                     from app.services.stock_service import get_available_sizes
                     available = get_available_sizes()
                     system = (
-                        f"{_PERSONA} "
+                        f"{_PERSONA} {_lang_instr} "
                         f"We don't have tyre data for this {partial_make} model in our catalogue. "
                         f"Tell the member honestly in 1-2 sentences. "
                         f"Suggest they type the tyre size directly (e.g. 205/55R16 — "
@@ -1746,7 +1875,7 @@ async def chat(req: ChatRequest):
                     )
                     session.preferences["suggested_models"] = known_models[:6]
                     system = (
-                        f"{_PERSONA} "
+                        f"{_PERSONA} {_lang_instr} "
                         f"Member mentioned {make} but didn't give the model. "
                         f"Ask which {make} model in one short friendly sentence. "
                         f"{model_hint}"
@@ -1755,7 +1884,7 @@ async def chat(req: ChatRequest):
                     response_text = _llm_respond(req.session_id, system, ctx)
                 else:
                     system = (
-                        f"{_PERSONA} "
+                        f"{_PERSONA} {_lang_instr} "
                         f"Can't determine what vehicle this is from the message. "
                         f"Ask for the car make and model in one short, friendly sentence. "
                         f"Or suggest they type the tyre size directly (it's on the sidewall, e.g. 205/55R16)."
@@ -1765,13 +1894,15 @@ async def chat(req: ChatRequest):
             else:
                 # Store the size and the car label the user mentioned
                 session.preferences["override_tyre_size"] = tyre_size
-                # Keep a display-friendly car name: prefer parsed make+model, fall back to raw msg
+                # Keep a display-friendly car name: prefer parsed make+model
                 if not size_match:  # came from car name, not a typed tyre size
                     parsed = _parse_vehicle_from_msg(msg)
                     if parsed and parsed.get("model") and parsed["model"] != "Unknown":
                         car_label = f"{parsed['make']} {parsed['model']}"
                     else:
-                        car_label = msg.strip().title()
+                        # Last resort: extract just the model name token from the message
+                        model_m = _MODEL_NAMES_RE.search(msg)
+                        car_label = model_m.group(1).title() if model_m else tyre_size
                     session.preferences["car_label"] = car_label
                 session.user_path = "B"
                 session.stage = "browse"
@@ -1801,7 +1932,7 @@ async def chat(req: ChatRequest):
                     available = get_available_sizes()
                     car_label = session.preferences.get("car_label", "") or tyre_size
                     system = (
-                        f"{_PERSONA} "
+                        f"{_PERSONA} {_lang_instr} "
                         f"We don't carry {tyre_size} tyres in our catalogue right now. "
                         f"Tell the member honestly in 2 short sentences. "
                         f"Mention we currently stock these sizes: {', '.join(available[:8])}. "
@@ -1874,7 +2005,7 @@ async def chat(req: ChatRequest):
                 car_label = session.preferences.get("car_label", "")
                 use_case = session.preferences.get("use_case", "")
                 _card_system = (
-                    f"{_PERSONA} "
+                    f"{_PERSONA} {_lang_instr} "
                     f"You've just pulled up tyre recommendations. "
                     f"Write ONE short sentence (max 20 words) handing over the cards. "
                     f"Include their name ({first}), their car ({car_label or tyre_size}), "
