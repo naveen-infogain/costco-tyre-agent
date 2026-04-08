@@ -1,3 +1,6 @@
+# ── CRM source data — sensitive, not for version control ──────────────────
+crm_data/
+
 # ── Secrets — NEVER commit these ──────────────────────────────────────────
 .env
 .env.local

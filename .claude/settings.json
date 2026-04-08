@@ -2,6 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(where python:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\satti.naveen\\.claude\\projects\\c--Users-satti-naveen-costco-tyre-agent"
     ]
   }
 }

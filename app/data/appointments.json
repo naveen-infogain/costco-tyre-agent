@@ -207,5 +207,38 @@
     "time": "14:00",
     "tyre_id": "a2sKa000001AA4fIAG",
     "status": "confirmed"
+  },
+  {
+    "booking_id": "BK-B06A14D5",
+    "member_id": "M10001",
+    "order_id": "ORD-AAE9D12C",
+    "location_id": "W003",
+    "slot_id": "W003-2026-04-09-1100",
+    "date": "2026-04-09",
+    "time": "11:00",
+    "tyre_id": "a2sKa000001AA4fIAG",
+    "status": "confirmed"
+  },
+  {
+    "booking_id": "BK-643795F7",
+    "member_id": "M10002",
+    "order_id": "ORD-E73E725C",
+    "location_id": "W003",
+    "slot_id": "W003-2026-04-11-1600",
+    "date": "2026-04-11",
+    "time": "16:00",
+    "tyre_id": "SYN-CEA-0060",
+    "status": "confirmed"
+  },
+  {
+    "booking_id": "BK-5E636ED9",
+    "member_id": "M10003",
+    "order_id": "ORD-49D9C51C",
+    "location_id": "W003",
+    "slot_id": "W003-2026-04-09-1500",
+    "date": "2026-04-09",
+    "time": "15:00",
+    "tyre_id": "a2sKa000001AA4fIAG",
+    "status": "confirmed"
   }
 ]
