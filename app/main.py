@@ -1046,7 +1046,9 @@ _PERSONA = (
     "Reference their specific situation — their city, vehicle, driving habits, or membership tier — "
     "to make every reply feel personal, not generic. "
     "Be encouraging and upbeat, but never pushy or over-the-top. "
-    "Keep responses short: the UI shows the details, your job is the human connection."
+    "Keep responses short: the UI shows the details, your job is the human connection. "
+    "NEVER ask for the member's name, city, or vehicle — all of that comes from their profile. "
+    "NEVER ask for information you already have. Just use it."
 )
 
 # ---------------------------------------------------------------------------
@@ -1414,6 +1416,11 @@ async def chat(req: ChatRequest):
     # Name, vehicle, city, season all known. Greeting is deterministic.
     elif intent == "same_vehicle" and session.stage == "confirm_vehicle":
         user = get_member(session.member_id)
+        if not user:
+            add_to_history(req.session_id, "assistant", "Profile not found — please re-enter your member ID.")
+            return JSONResponse({"message": "I couldn't load your profile — please re-enter your member ID.",
+                                 "cards": [], "comparison": None, "appointment_slots": [],
+                                 "booking_card": None, "quick_replies": [], "recovery": None})
         session.user_path = "A" if is_returning_buyer(session.member_id) else "B"
         session.stage = "browse"
 
@@ -1634,7 +1641,8 @@ async def chat(req: ChatRequest):
     # ── STAGE: collect tyre size or car make → build Path B cards ─────────
     # Primary: tyre size (e.g. 235/65R17) — used directly for search
     # Fallback: car make/model → infer size from _VEHICLE_SIZE_MAP
-    elif intent == "new_vehicle_detail" and session.stage == "collect_vehicle":
+    elif intent == "new_vehicle_detail" and session.stage in ("collect_vehicle", "confirm_vehicle"):
+        session.stage = "collect_vehicle"  # normalise so rest of handler works
         user = get_member(session.member_id)
 
         # Safety guard: if the message looks like a same-vehicle confirmation in any
@@ -1751,10 +1759,12 @@ async def chat(req: ChatRequest):
                 )
                 results = svc_search(size=tyre_size, season=season, terrain=terrain, in_stock_only=True)
                 if len(results) < 3:
-                    _extra = svc_search(size=tyre_size, season="all-season", terrain=terrain, in_stock_only=True)
+                    # Broaden: relax season constraint, keep terrain
+                    _extra = svc_search(size=tyre_size, terrain=terrain, in_stock_only=True)
                     _seen = {t.id for t in results}
                     results += [t for t in _extra if t.id not in _seen]
                 if len(results) < 3:
+                    # Broaden further: drop both season and terrain — size match only
                     _extra = svc_search(size=tyre_size, in_stock_only=True)
                     _seen = {t.id for t in results}
                     results += [t for t in _extra if t.id not in _seen]
@@ -2233,6 +2243,54 @@ async def voice_tts(req: TTSRequest):
 async def serve_ui():
     index = _STATIC_DIR / "index.html"
     return FileResponse(str(index)) if index.exists() else JSONResponse({"error": "UI not built"}, status_code=503)
+
+@app.get("/demo-members")
+async def demo_members():
+    """Return first 5 members for login demo chips — DB first, JSON fallback."""
+    from app.db.connection import db_available, get_conn, release_conn
+    members = []
+
+    if db_available():
+        try:
+            conn = get_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT member_id, full_name, membership_tier,
+                               vehicle_make, vehicle_model, vehicle_year
+                        FROM contacts
+                        ORDER BY member_id
+                        LIMIT 5
+                    """)
+                    for row in cur.fetchall():
+                        members.append({
+                            "member_id": row[0],
+                            "name": row[1],
+                            "tier": row[2].title() if row[2] else "Standard",
+                            "vehicle": f"{row[5]} {row[3]} {row[4]}".strip(),
+                        })
+            finally:
+                release_conn(conn)
+        except Exception as e:
+            logger.warning("demo_members DB failed: %s", e)
+
+    # JSON fallback
+    if not members:
+        from app.services.profile_service import _load_users
+        try:
+            for u in _load_users()[:5]:
+                v = u.get("vehicle", {})
+                members.append({
+                    "member_id": u["member_id"],
+                    "name": u.get("name", ""),
+                    "tier": u.get("membership_tier", "standard").title(),
+                    "vehicle": f"{v.get('year','')} {v.get('make','')} {v.get('model','')}".strip(),
+                })
+        except Exception:
+            pass
+
+    return members
+
 
 @app.get("/health")
 async def health():

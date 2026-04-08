@@ -1,59 +1,1068 @@
 [
   {
-    "member_id": "M10042",
-    "name": "Sarah Chen",
-    "membership_tier": "executive",
-    "location": {"city": "Seattle", "zip": "98101"},
-    "vehicle": {"make": "Toyota", "model": "Camry", "year": 2020},
-    "driving_habits": ["highway", "daily commute"],
+    "member_id": "M10001",
+    "name": "Robert Fontana",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Multnomah",
+      "zip": "97233"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Seltos",
+      "year": 2021
+    },
+    "driving_habits": [
+      "daily commute"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10002",
+    "name": "Peter Foss",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Multnomah",
+      "zip": "97233"
+    },
+    "vehicle": {
+      "make": "Ford",
+      "model": "F-150",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10003",
+    "name": "Ed Hennessy",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Jefferson",
+      "zip": "77701"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "RAV4",
+      "year": 2022
+    },
+    "driving_habits": [
+      "daily commute"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10004",
+    "name": "Martin Woodson",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Multnomah",
+      "zip": "97233"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Sonet",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10005",
+    "name": "Jamie Green",
+    "membership_tier": "gold",
+    "location": {
+      "city": "San Francisco",
+      "zip": "94133"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2021
+    },
+    "driving_habits": [
+      "off-road",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10006",
+    "name": "Richard O'Brien Jr",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Multnomah",
+      "zip": "97233"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Sonet",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway"
+    ],
     "last_purchase": {
-      "tyre_id": "BRI-TUR-20555R16",
-      "date": "2024-09-15",
-      "mileage_at_purchase": 34200
+      "tyre_id": "a2sKa000001AA4cIAG",
+      "date": "2026-03-01",
+      "mileage_at_purchase": 0
     }
+  },
+  {
+    "member_id": "M10007",
+    "name": "Joseph Gillespie",
+    "membership_tier": "executive",
+    "location": {
+      "city": "Multnomah",
+      "zip": "97233"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Seltos",
+      "year": 2021
+    },
+    "driving_habits": [
+      "city",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4dIAG",
+      "date": "2026-03-02",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10008",
+    "name": "Bjorn Lundgren",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Dallas",
+      "zip": "75225"
+    },
+    "vehicle": {
+      "make": "Hyundai",
+      "model": "Venue",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "weekend"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4fIAG",
+      "date": "2026-03-03",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10009",
+    "name": "Judy Odom",
+    "membership_tier": "executive",
+    "location": {
+      "city": "New Hanover",
+      "zip": "28403"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Seltos",
+      "year": 2021
+    },
+    "driving_habits": [
+      "city"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4gIAG",
+      "date": "2026-03-04",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10010",
+    "name": "Michelle Green",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Multnomah",
+      "zip": "97233"
+    },
+    "vehicle": {
+      "make": "Mahindra",
+      "model": "Scorpio N",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4eIAG",
+      "date": "2026-03-02",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10011",
+    "name": "Bill Blau",
+    "membership_tier": "standard",
+    "location": {
+      "city": "San Francisco",
+      "zip": "94108"
+    },
+    "vehicle": {
+      "make": "Hyundai",
+      "model": "Creta",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4hIAG",
+      "date": "2026-03-05",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10012",
+    "name": "Chris Friedman",
+    "membership_tier": "executive",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Elevate",
+      "year": 2023
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA5DIAW",
+      "date": "2026-02-15",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10013",
+    "name": "Brenda Mcclure",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Tata",
+      "model": "Nexon",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA5EIAW",
+      "date": "2026-02-16",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10014",
+    "name": "Thomas Green",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "RAV4",
+      "year": 2022
+    },
+    "driving_habits": [
+      "off-road",
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA5FIAW",
+      "date": "2026-02-17",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10015",
+    "name": "Danielle Hauck",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "Camry",
+      "year": 2020
+    },
+    "driving_habits": [
+      "highway",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4cIAG",
+      "date": "2026-02-18",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10016",
+    "name": "Steve Ishikawa",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Ford",
+      "model": "F-150",
+      "year": 2022
+    },
+    "driving_habits": [
+      "off-road",
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA5CIAW",
+      "date": "2026-03-27",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10017",
+    "name": "George Mazzotta",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Hyundai",
+      "model": "Venue",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4mIAG",
+      "date": "2026-02-19",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10018",
+    "name": "Jeff Blay",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Alameda",
+      "zip": "94601"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2021
+    },
+    "driving_habits": [
+      "city",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4jIAG",
+      "date": "2026-03-06",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10019",
+    "name": "Lisa Jones",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Denver",
+      "zip": "80223"
+    },
+    "vehicle": {
+      "make": "Nissan",
+      "model": "Rogue",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4kIAG",
+      "date": "2026-03-07",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10020",
+    "name": "Ron Reid",
+    "membership_tier": "standard",
+    "location": {
+      "city": "San Diego",
+      "zip": "92105"
+    },
+    "vehicle": {
+      "make": "Subaru",
+      "model": "Outback",
+      "year": 2020
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4iIAG",
+      "date": "2026-03-05",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10021",
+    "name": "Derek Rose",
+    "membership_tier": "standard",
+    "location": {
+      "city": "King",
+      "zip": "98117"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2021
+    },
+    "driving_habits": [
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4lIAG",
+      "date": "2026-03-08",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10022",
+    "name": "Laura Rossi",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Genève",
+      "zip": "1205"
+    },
+    "vehicle": {
+      "make": "Hyundai",
+      "model": "Creta",
+      "year": 2022
+    },
+    "driving_habits": [
+      "off-road",
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4mIAG",
+      "date": "2026-03-09",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10023",
+    "name": "Barry Brown",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Orlando",
+      "zip": "98101"
+    },
+    "vehicle": {
+      "make": "Subaru",
+      "model": "Outback",
+      "year": 2020
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4oIAG",
+      "date": "2026-03-10",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10024",
+    "name": "Sarah Jeffries",
+    "membership_tier": "gold",
+    "location": {
+      "city": "King",
+      "zip": "98109"
+    },
+    "vehicle": {
+      "make": "Tata",
+      "model": "Punch",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "weekend"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4pIAG",
+      "date": "2026-03-11",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10025",
+    "name": "Chris Templey",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Delaware",
+      "zip": "19073"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Seltos",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4nIAG",
+      "date": "2026-03-10",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10026",
+    "name": "Mark Metz",
+    "membership_tier": "standard",
+    "location": {
+      "city": "San Francisco",
+      "zip": "94105"
+    },
+    "vehicle": {
+      "make": "Nissan",
+      "model": "Rogue",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10027",
+    "name": "James Weiss",
+    "membership_tier": "executive",
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "Camry",
+      "year": 2020
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10028",
+    "name": "Patricia Feager",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Elevate",
+      "year": 2023
+    },
+    "driving_habits": [
+      "highway",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4wIAG",
+      "date": "2026-02-20",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10029",
+    "name": "Arthur Song",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Shelby",
+      "zip": "38111"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "Fortuner",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA55IAG",
+      "date": "2026-02-21",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10030",
+    "name": "Keith Lopez",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Mahindra",
+      "model": "Scorpio N",
+      "year": 2022
+    },
+    "driving_habits": [
+      "off-road",
+      "highway"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10031",
+    "name": "Al Miller",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Tata",
+      "model": "Punch",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10032",
+    "name": "Jan Perkins",
+    "membership_tier": "executive",
+    "location": {
+      "city": "Friedensburg",
+      "zip": "17933"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2021
+    },
+    "driving_habits": [
+      "off-road",
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4rIAG",
+      "date": "2026-03-12",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10033",
+    "name": "Bonnie Barra",
+    "membership_tier": "executive",
+    "location": {
+      "city": "San Miguel",
+      "zip": "93451"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "RAV4",
+      "year": 2022
+    },
+    "driving_habits": [
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4sIAG",
+      "date": "2026-03-13",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10034",
+    "name": "Ryan Gray",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Baltimore",
+      "zip": "21223"
+    },
+    "vehicle": {
+      "make": "Maruti",
+      "model": "Swift",
+      "year": 2021
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4qIAG",
+      "date": "2026-03-12",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10035",
+    "name": "Bruce Watkins",
+    "membership_tier": "executive",
+    "location": {
+      "city": "Stevens Point",
+      "zip": "54481"
+    },
+    "vehicle": {
+      "make": "Tata",
+      "model": "Nexon",
+      "year": 2022
+    },
+    "driving_habits": [
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4tIAG",
+      "date": "2026-03-14",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10036",
+    "name": "Bradley Harmon",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Wichita",
+      "zip": "67208"
+    },
+    "vehicle": {
+      "make": "Nissan",
+      "model": "Rogue",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA4uIAG",
+      "date": "2026-03-15",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10037",
+    "name": "Sandy Jones",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Wichita",
+      "zip": "67208"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "RAV4",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "daily commute"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA58IAG",
+      "date": "2026-03-25",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10038",
+    "name": "Doug Hart",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Wichita",
+      "zip": "67208"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Civic",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA59IAG",
+      "date": "2026-03-26",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10039",
+    "name": "Mary McDaniel",
+    "membership_tier": "standard",
+    "location": {
+      "city": "San Francisco",
+      "zip": "94105"
+    },
+    "vehicle": {
+      "make": "Tata",
+      "model": "Nexon",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA5AIAW",
+      "date": "2026-03-26",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10040",
+    "name": "Greg Walker",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Wichita",
+      "zip": "67208"
+    },
+    "vehicle": {
+      "make": "Kia",
+      "model": "Sonet",
+      "year": 2021
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA57IAG",
+      "date": "2026-03-25",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10041",
+    "name": "Daryl Distributor",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Riverside",
+      "zip": "92501"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "Camry",
+      "year": 2020
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": {
+      "tyre_id": "a2sKa000001AA5BIAW",
+      "date": "2026-03-27",
+      "mileage_at_purchase": 0
+    }
+  },
+  {
+    "member_id": "M10042",
+    "name": "Sean Murphy",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Toyota",
+      "model": "RAV4",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
   },
   {
     "member_id": "M10043",
-    "name": "James Park",
-    "membership_tier": "gold",
-    "location": {"city": "Portland", "zip": "97201"},
-    "vehicle": {"make": "Ford", "model": "F-150", "year": 2021},
-    "driving_habits": ["highway", "off-road", "towing"],
-    "last_purchase": {
-      "tyre_id": "GYR-WRNG-23565R17",
-      "date": "2023-11-08",
-      "mileage_at_purchase": 22500
-    }
+    "name": "Stephanie Curran",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Honda",
+      "model": "Elevate",
+      "year": 2023
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
+    "last_purchase": null
   },
   {
     "member_id": "M10044",
-    "name": "Emily Torres",
+    "name": "Kathy Fitzpatrick",
     "membership_tier": "executive",
-    "location": {"city": "San Francisco", "zip": "94102"},
-    "vehicle": {"make": "Honda", "model": "CR-V", "year": 2022},
-    "driving_habits": ["city", "highway", "weekend trips"],
+    "location": {
+      "city": "Foster City",
+      "zip": "94404"
+    },
+    "vehicle": {
+      "make": "Nissan",
+      "model": "Rogue",
+      "year": 2021
+    },
+    "driving_habits": [
+      "city"
+    ],
     "last_purchase": null
   },
   {
     "member_id": "M10045",
-    "name": "David Kim",
+    "name": "Ed Flachbarth",
     "membership_tier": "gold",
-    "location": {"city": "Los Angeles", "zip": "90001"},
-    "vehicle": {"make": "BMW", "model": "3 Series", "year": 2022},
-    "driving_habits": ["highway", "spirited driving"],
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Hyundai",
+      "model": "Venue",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
     "last_purchase": null
   },
   {
     "member_id": "M10046",
-    "name": "Lisa Wang",
+    "name": "Jeff Kane",
     "membership_tier": "standard",
-    "location": {"city": "Phoenix", "zip": "85001"},
-    "vehicle": {"make": "Toyota", "model": "RAV4", "year": 2019},
-    "driving_habits": ["highway", "city", "light off-road"],
-    "last_purchase": {
-      "tyre_id": "CON-CTXS-23565R17",
-      "date": "2024-03-22",
-      "mileage_at_purchase": 41800
-    }
+    "location": {
+      "city": "Santa Clara",
+      "zip": "95125"
+    },
+    "vehicle": {
+      "make": "Ford",
+      "model": "F-150",
+      "year": 2022
+    },
+    "driving_habits": [
+      "highway",
+      "long drive"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10047",
+    "name": "Robert Janzen",
+    "membership_tier": "executive",
+    "location": {
+      "city": "Wichita",
+      "zip": "67208"
+    },
+    "vehicle": {
+      "make": "Subaru",
+      "model": "Outback",
+      "year": 2020
+    },
+    "driving_habits": [
+      "city",
+      "weekend"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10048",
+    "name": "Heath Axworth",
+    "membership_tier": "standard",
+    "location": {
+      "city": "Seattle",
+      "zip": "98101"
+    },
+    "vehicle": {
+      "make": "Hyundai",
+      "model": "Venue",
+      "year": 2022
+    },
+    "driving_habits": [
+      "city",
+      "daily commute"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10049",
+    "name": "Duncan Macintosh",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Seattle",
+      "zip": "98101"
+    },
+    "vehicle": {
+      "make": "BMW",
+      "model": "3 Series",
+      "year": 2020
+    },
+    "driving_habits": [
+      "daily commute"
+    ],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10050",
+    "name": "Lance Gonzales",
+    "membership_tier": "gold",
+    "location": {
+      "city": "Seattle",
+      "zip": "98101"
+    },
+    "vehicle": {
+      "make": "Tata",
+      "model": "Punch",
+      "year": 2022
+    },
+    "driving_habits": [
+      "off-road",
+      "highway"
+    ],
+    "last_purchase": null
   }
 ]

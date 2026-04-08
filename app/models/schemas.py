@@ -32,6 +32,8 @@ class Tyre(BaseModel):
     compatible_vehicles: list[str]
     stock: TyreStock
     active_promotion: Optional[str] = None
+    image_url: Optional[str] = None
+    description: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

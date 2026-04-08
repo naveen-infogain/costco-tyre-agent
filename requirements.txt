@@ -27,3 +27,6 @@ icalendar>=5.0.12
 
 # ElevenLabs voice (optional — TTS disabled if ELEVENLABS_API_KEY not set)
 elevenlabs>=1.3.0
+
+# PostgreSQL (optional — app falls back to JSON if not configured)
+psycopg2-binary>=2.9.9
