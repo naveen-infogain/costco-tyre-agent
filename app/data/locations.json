@@ -1,0 +1,47 @@
+[
+  {
+    "id": "W001",
+    "name": "Costco Tyre Centre — Seattle Northgate",
+    "address": "401 NE Northgate Way, Seattle WA 98125",
+    "lat": 47.706,
+    "lng": -122.325,
+    "hours": "Mon-Fri 10am-8:30pm, Sat-Sun 9:30am-6pm",
+    "avg_wait_mins": 35
+  },
+  {
+    "id": "W002",
+    "name": "Costco Tyre Centre — Portland Tigard",
+    "address": "7850 SW Dartmouth St, Tigard OR 97223",
+    "lat": 45.427,
+    "lng": -122.777,
+    "hours": "Mon-Fri 10am-8:30pm, Sat-Sun 9:30am-6pm",
+    "avg_wait_mins": 28
+  },
+  {
+    "id": "W003",
+    "name": "Costco Tyre Centre — San Francisco South Bay",
+    "address": "2200 Senter Rd, San Jose CA 95112",
+    "lat": 37.314,
+    "lng": -121.856,
+    "hours": "Mon-Fri 10am-8:30pm, Sat-Sun 9:30am-6pm",
+    "avg_wait_mins": 42
+  },
+  {
+    "id": "W004",
+    "name": "Costco Tyre Centre — Los Angeles Inglewood",
+    "address": "3560 W Century Blvd, Inglewood CA 90303",
+    "lat": 33.949,
+    "lng": -118.360,
+    "hours": "Mon-Fri 10am-8:30pm, Sat-Sun 9:30am-6pm",
+    "avg_wait_mins": 50
+  },
+  {
+    "id": "W005",
+    "name": "Costco Tyre Centre — Phoenix Chandler",
+    "address": "1900 S. Arizona Ave, Chandler AZ 85286",
+    "lat": 33.286,
+    "lng": -111.814,
+    "hours": "Mon-Fri 10am-8:30pm, Sat-Sun 9:30am-6pm",
+    "avg_wait_mins": 22
+  }
+]

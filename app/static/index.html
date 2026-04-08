@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Costco Tyre Assistant</title>
+
+  <!-- Material Design 3 — Material Symbols + Roboto -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── MD3 Design Tokens ───────────────────────────────────────────── */
+    :root {
+      --md-sys-color-primary:           #005CA9;
+      --md-sys-color-on-primary:        #FFFFFF;
+      --md-sys-color-primary-container: #D3E4FF;
+      --md-sys-color-on-primary-container: #001C3D;
+      --md-sys-color-secondary:         #E31837;
+      --md-sys-color-secondary-container: #FFDAD7;
+      --md-sys-color-surface:           #F8FAFE;
+      --md-sys-color-surface-variant:   #DFE2EB;
+      --md-sys-color-on-surface:        #1A1C1E;
+      --md-sys-color-on-surface-variant:#42474E;
+      --md-sys-color-outline:           #72777F;
+      --md-sys-color-outline-variant:   #C2C7CF;
+      --md-sys-color-background:        #F3F5FA;
+      --md-sys-color-success:           #1B6B2C;
+      --md-sys-color-warning:           #7B5800;
+      --md-sys-color-error:             #BA1A1A;
+
+      --md-sys-typescale-display-small: 700 36px/44px 'Roboto', sans-serif;
+      --md-sys-typescale-headline-medium: 500 28px/36px 'Roboto', sans-serif;
+      --md-sys-typescale-title-large:   500 22px/28px 'Roboto', sans-serif;
+      --md-sys-typescale-title-medium:  500 16px/24px 'Roboto', sans-serif;
+      --md-sys-typescale-body-large:    400 16px/24px 'Roboto', sans-serif;
+      --md-sys-typescale-body-medium:   400 14px/20px 'Roboto', sans-serif;
+      --md-sys-typescale-label-large:   500 14px/20px 'Roboto', sans-serif;
+      --md-sys-typescale-label-medium:  500 12px/16px 'Roboto', sans-serif;
+
+      --md-sys-shape-corner-small:   8px;
+      --md-sys-shape-corner-medium:  12px;
+      --md-sys-shape-corner-large:   16px;
+      --md-sys-shape-corner-xl:      28px;
+
+      --md-elevation-1: 0 1px 2px rgba(0,0,0,.10), 0 1px 3px 1px rgba(0,0,0,.07);
+      --md-elevation-2: 0 1px 2px rgba(0,0,0,.12), 0 2px 6px 2px rgba(0,0,0,.09);
+      --md-elevation-3: 0 4px 8px 3px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.12);
+    }
+
+    /* ── Reset + Base ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font: var(--md-sys-typescale-body-large); background: var(--md-sys-color-background); color: var(--md-sys-color-on-surface); }
+    .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 20px; }
+
+    /* ── Layout ─────────────────────────────────────────────────────── */
+    #app { display: grid; grid-template-rows: 64px 1fr 80px; height: 100vh; max-width: 900px; margin: 0 auto; }
+
+    /* ── Top App Bar ─────────────────────────────────────────────────── */
+    #topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 16px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      box-shadow: var(--md-elevation-2);
+      z-index: 10;
+    }
+    #topbar .logo { font-size: 28px; }
+    #topbar h1 { font: 500 20px/28px 'Roboto',sans-serif; flex: 1; }
+    #topbar .stage-chip {
+      font: var(--md-sys-typescale-label-medium);
+      background: rgba(255,255,255,.2);
+      border-radius: 100px;
+      padding: 4px 12px;
+    }
+    #topbar a {
+      color: var(--md-sys-color-on-primary);
+      text-decoration: none;
+      opacity: .85;
+      font: var(--md-sys-typescale-label-large);
+      display: flex; align-items: center; gap: 4px;
+    }
+    #topbar a:hover { opacity: 1; }
+
+    /* ── Chat Feed ───────────────────────────────────────────────────── */
+    #feed {
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+
+    /* ── Message Bubbles ─────────────────────────────────────────────── */
+    .msg-row { display: flex; gap: 8px; align-items: flex-end; }
+    .msg-row.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .avatar.bot  { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); }
+    .avatar.user { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-secondary); }
+
+    .bubble {
+      max-width: 72%;
+      padding: 12px 16px;
+      border-radius: var(--md-sys-shape-corner-large);
+      line-height: 1.5;
+      font: var(--md-sys-typescale-body-large);
+    }
+    .msg-row.bot  .bubble { background: #fff; border-bottom-left-radius: 4px; box-shadow: var(--md-elevation-1); }
+    .msg-row.user .bubble { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border-bottom-right-radius: 4px; }
+
+    /* feedback thumbs on bot bubbles */
+    .bubble-actions { display: flex; gap: 4px; margin-top: 8px; justify-content: flex-end; }
+    .thumb-btn {
+      background: none; border: none; cursor: pointer; padding: 4px 6px;
+      border-radius: 100px; transition: background .15s;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 16px; display: flex; align-items: center;
+    }
+    .thumb-btn:hover { background: var(--md-sys-color-surface-variant); }
+    .thumb-btn.active { color: var(--md-sys-color-primary); }
+
+    /* ── Typing indicator ────────────────────────────────────────────── */
+    .typing { display: flex; gap: 4px; padding: 14px 16px; align-items: center; }
+    .typing span { width: 8px; height: 8px; border-radius: 50%; background: var(--md-sys-color-outline); animation: bounce .9s infinite; }
+    .typing span:nth-child(2) { animation-delay: .15s; }
+    .typing span:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+
+    /* ── Tyre Cards ──────────────────────────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+      width: 100%;
+    }
+
+    .tyre-card {
+      background: #fff;
+      border-radius: var(--md-sys-shape-corner-large);
+      box-shadow: var(--md-elevation-1);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      transition: box-shadow .2s, transform .2s;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .tyre-card:hover { box-shadow: var(--md-elevation-3); transform: translateY(-2px); }
+    .tyre-card.selected { border-color: var(--md-sys-color-primary); }
+
+    .card-header {
+      padding: 12px 14px 8px;
+      background: var(--md-sys-color-primary-container);
+    }
+    .slot-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border-radius: 100px;
+      padding: 2px 10px;
+      font: var(--md-sys-typescale-label-medium);
+      margin-bottom: 8px;
+    }
+    .slot-tag .material-symbols-rounded { font-size: 14px; }
+    .card-brand { font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-on-surface-variant); text-transform: uppercase; letter-spacing: .5px; }
+    .card-model { font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-on-primary-container); margin-top: 2px; }
+    .card-size  { font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
+
+    .card-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+    .price-row { display: flex; align-items: baseline; gap: 8px; }
+    .member-price { font: var(--md-sys-typescale-title-large); color: var(--md-sys-color-primary); }
+    .retail-price { font: var(--md-sys-typescale-body-medium); color: var(--md-sys-color-outline); text-decoration: line-through; }
+    .price-label  { font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-on-surface-variant); }
+
+    .rating-row { display: flex; align-items: center; gap: 6px; }
+    .stars { color: #F9A825; font-size: 14px; letter-spacing: 1px; }
+    .review-count { font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-outline); }
+
+    .stock-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font: var(--md-sys-typescale-label-medium);
+      padding: 3px 8px;
+      border-radius: 100px;
+    }
+    .stock-badge.in  { background: #E8F5E9; color: var(--md-sys-color-success); }
+    .stock-badge.out { background: #FFEBEE; color: var(--md-sys-color-error); }
+
+    .promo-chip {
+      background: #FFF8E1;
+      color: var(--md-sys-color-warning);
+      border-radius: var(--md-sys-shape-corner-small);
+      padding: 4px 8px;
+      font: var(--md-sys-typescale-label-medium);
+    }
+
+    .personalised-msg {
+      font: var(--md-sys-typescale-body-medium);
+      color: var(--md-sys-color-on-surface-variant);
+      border-left: 3px solid var(--md-sys-color-primary-container);
+      padding-left: 8px;
+      line-height: 1.4;
+    }
+
+    .punch-line {
+      font: 500 13px/18px 'Roboto',sans-serif;
+      color: var(--md-sys-color-primary);
+      font-style: italic;
+    }
+
+    .card-actions {
+      padding: 8px 14px 12px;
+      display: flex; gap: 8px; align-items: center;
+    }
+    /* Primary CTA — "Add to Cart" */
+    .btn-primary {
+      flex: 1;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border: none; border-radius: 100px;
+      padding: 10px 20px;
+      font: var(--md-sys-typescale-label-large);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: opacity .15s, box-shadow .15s;
+    }
+    .btn-primary:hover { opacity: .9; box-shadow: var(--md-elevation-1); }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+    /* Secondary — "Details" */
+    .btn-secondary {
+      background: transparent;
+      color: var(--md-sys-color-primary);
+      border: 1.5px solid var(--md-sys-color-primary);
+      border-radius: 100px;
+      padding: 8px 14px;
+      font: var(--md-sys-typescale-label-large);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn-secondary:hover { background: var(--md-sys-color-primary-container); }
+    .btn-icon {
+      background: var(--md-sys-color-surface-variant);
+      border: none; border-radius: 100px;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background .15s;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .btn-icon:hover { background: var(--md-sys-color-outline-variant); }
+    .btn-icon.liked  { color: var(--md-sys-color-primary); background: var(--md-sys-color-primary-container); }
+    .btn-icon.disliked { color: var(--md-sys-color-error); background: #FFEBEE; }
+
+    /* ── Compare Card ─────────────────────────────────────────────────── */
+    .compare-toggle-row { margin-top: 8px; }
+    .btn-compare {
+      background: var(--md-sys-color-surface-variant);
+      border: none; border-radius: 100px;
+      padding: 8px 18px;
+      font: var(--md-sys-typescale-label-large);
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--md-sys-color-on-surface-variant);
+      transition: background .15s;
+    }
+    .btn-compare:hover { background: var(--md-sys-color-outline-variant); }
+
+    .compare-card {
+      background: #fff;
+      border-radius: var(--md-sys-shape-corner-large);
+      box-shadow: var(--md-elevation-2);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .compare-header {
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      padding: 12px 16px;
+      font: var(--md-sys-typescale-title-medium);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .compare-table { width: 100%; border-collapse: collapse; font: var(--md-sys-typescale-body-medium); }
+    .compare-table th {
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+      padding: 10px 14px;
+      text-align: left;
+      font: var(--md-sys-typescale-label-large);
+    }
+    .compare-table td { padding: 10px 14px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:hover td { background: var(--md-sys-color-surface); }
+    .cmp-label { color: var(--md-sys-color-on-surface-variant); font: var(--md-sys-typescale-label-medium); }
+
+    .pros-cons { padding: 12px 16px; display: grid; gap: 12px; }
+    .pros-cons-item h4 { font: var(--md-sys-typescale-label-large); margin-bottom: 4px; }
+    .pros-list { list-style: none; }
+    .pros-list li { display: flex; gap: 6px; align-items: flex-start; font: var(--md-sys-typescale-body-medium); margin-bottom: 2px; }
+    .pros-list li.pro  { color: var(--md-sys-color-success); }
+    .pros-list li.con  { color: var(--md-sys-color-error); }
+    .cost-badge {
+      display: inline-block;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-on-primary-container);
+      border-radius: 100px;
+      padding: 2px 10px;
+      font: var(--md-sys-typescale-label-medium);
+      margin-top: 4px;
+    }
+
+    /* ── Drop Recovery Banner ─────────────────────────────────────────── */
+    .recovery-banner {
+      background: #FFF8E1;
+      border: 1px solid #FFE082;
+      border-radius: var(--md-sys-shape-corner-medium);
+      padding: 10px 14px;
+      font: var(--md-sys-typescale-body-medium);
+      color: var(--md-sys-color-warning);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── Input Bar ───────────────────────────────────────────────────── */
+    #inputbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 16px;
+      background: #fff;
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+      box-shadow: 0 -2px 8px rgba(0,0,0,.06);
+    }
+    #inputbar textarea {
+      flex: 1;
+      border: none; outline: none; resize: none;
+      font: var(--md-sys-typescale-body-large);
+      color: var(--md-sys-color-on-surface);
+      background: transparent;
+      max-height: 120px;
+      padding: 20px 0;
+      line-height: 1.5;
+    }
+    #inputbar textarea::placeholder { color: var(--md-sys-color-outline); }
+    #send-btn {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      box-shadow: var(--md-elevation-2);
+      transition: opacity .15s, transform .1s;
+    }
+    #send-btn:hover { opacity: .92; transform: scale(1.05); }
+    #send-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    /* ── Voice controls ─────────────────────────────────────────────── */
+    #mic-btn {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--md-sys-color-surface-variant);
+      color: var(--md-sys-color-on-surface-variant);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background .15s, color .15s, transform .1s;
+    }
+    #mic-btn:hover { background: var(--md-sys-color-outline-variant); }
+    #mic-btn.listening {
+      background: var(--md-sys-color-secondary);
+      color: #fff;
+      animation: mic-pulse 1s infinite;
+    }
+    #mic-btn.disabled { opacity: .35; cursor: not-allowed; }
+    @keyframes mic-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+
+    #tts-btn {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-primary);
+      border: none; cursor: pointer;
+      display: none; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-left: 4px;
+      transition: background .15s;
+    }
+    #tts-btn.visible { display: flex; }
+    #tts-btn.playing { background: var(--md-sys-color-primary); color: #fff; }
+    #tts-btn .material-symbols-rounded { font-size: 16px; }
+
+    .voice-transcript {
+      font: 400 13px/20px 'Roboto',sans-serif;
+      color: var(--md-sys-color-outline);
+      font-style: italic;
+      padding: 4px 16px 0;
+    }
+
+    /* ── Appointment Slots ─────────────────────────────────────────────── */
+    .slots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px; margin-top: 8px;
+    }
+    .slot-chip {
+      background: #fff;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: var(--md-sys-shape-corner-medium);
+      padding: 10px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      font: var(--md-sys-typescale-body-medium);
+    }
+    .slot-chip:hover { border-color: var(--md-sys-color-primary); background: var(--md-sys-color-primary-container); }
+    .slot-chip .slot-date { font: var(--md-sys-typescale-label-large); }
+    .slot-chip .slot-time { font: var(--md-sys-typescale-title-medium); color: var(--md-sys-color-primary); }
+    .slot-chip .slot-wait { font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-outline); }
+
+    /* ── Booking confirmation card ───────────────────────────────────── */
+    .booking-card {
+      background: #fff;
+      border: 2px solid var(--md-sys-color-primary);
+      border-radius: var(--md-sys-shape-corner-large);
+      padding: 20px;
+      margin-top: 8px;
+      max-width: 420px;
+    }
+    .booking-card .bc-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 16px;
+    }
+    .booking-card .bc-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--md-sys-color-primary);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .booking-card .bc-title { font: var(--md-sys-typescale-title-medium); }
+    .booking-card .bc-id { font: var(--md-sys-typescale-label-medium); color: var(--md-sys-color-outline); }
+    .booking-card .bc-row {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 8px 0; border-top: 1px solid var(--md-sys-color-outline-variant);
+      font: var(--md-sys-typescale-body-medium);
+    }
+    .booking-card .bc-row .bc-label {
+      color: var(--md-sys-color-outline); min-width: 72px;
+      font: var(--md-sys-typescale-label-medium);
+    }
+    .booking-card .bc-bring {
+      background: var(--md-sys-color-primary-container);
+      border-radius: var(--md-sys-shape-corner-small);
+      padding: 8px 12px; margin-top: 12px;
+      font: var(--md-sys-typescale-label-medium);
+      color: var(--md-sys-color-on-primary-container);
+    }
+    .booking-card .bc-bring ul { padding-left: 16px; margin: 4px 0 0; }
+    .bc-download-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; margin-top: 14px; padding: 10px 16px;
+      background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+      border: none; border-radius: var(--md-sys-shape-corner-medium);
+      font: var(--md-sys-typescale-label-large); cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .bc-download-btn:hover { opacity: 0.88; }
+    .bc-download-btn .material-symbols-rounded { font-size: 18px; }
+
+    /* ── Quick-reply chips ────────────────────────────────────────────── */
+    .quick-reply-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 4px 0 8px 44px; /* indent to align under bot bubble */
+    }
+    .qr-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: 1.5px solid var(--md-sys-color-primary);
+      border-radius: 100px;
+      background: transparent;
+      color: var(--md-sys-color-primary);
+      font: var(--md-sys-typescale-label-large);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .qr-chip:hover {
+      background: var(--md-sys-color-primary-container);
+    }
+    .qr-chip.used {
+      opacity: .4;
+      pointer-events: none;
+    }
+
+    /* ── Login Modal ──────────────────────────────────────────────────── */
+    #login-backdrop {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,.45);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    #login-backdrop.closing {
+      animation: backdropOut .25s ease forwards;
+    }
+    @keyframes backdropOut {
+      to { opacity: 0; }
+    }
+
+    #login-card {
+      background: #fff;
+      border-radius: var(--md-sys-shape-corner-xl);
+      box-shadow: var(--md-elevation-3);
+      width: 100%; max-width: 400px;
+      overflow: hidden;
+      animation: cardIn .28s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes cardIn {
+      from { transform: translateY(24px) scale(.96); opacity: 0; }
+      to   { transform: translateY(0)    scale(1);   opacity: 1; }
+    }
+    #login-card.closing {
+      animation: cardOut .2s ease forwards;
+    }
+    @keyframes cardOut {
+      to { transform: translateY(-16px) scale(.97); opacity: 0; }
+    }
+
+    .login-header {
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      padding: 28px 28px 24px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .login-header .brand-row {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .login-header .brand-row span.material-symbols-rounded {
+      font-size: 32px;
+    }
+    .login-header h2 {
+      font: 700 22px/28px 'Roboto', sans-serif;
+      margin: 0;
+    }
+    .login-header p {
+      font: var(--md-sys-typescale-body-medium);
+      opacity: .85;
+      margin: 0;
+    }
+
+    .login-body {
+      padding: 28px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+
+    .login-field {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .login-field label {
+      font: var(--md-sys-typescale-label-large);
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .login-field input {
+      height: 56px;
+      padding: 0 16px;
+      border: 1.5px solid var(--md-sys-color-outline);
+      border-radius: var(--md-sys-shape-corner-small);
+      font: var(--md-sys-typescale-body-large);
+      color: var(--md-sys-color-on-surface);
+      background: var(--md-sys-color-surface);
+      outline: none;
+      transition: border-color .15s;
+      letter-spacing: .5px;
+    }
+    .login-field input:focus {
+      border-color: var(--md-sys-color-primary);
+      border-width: 2px;
+    }
+    .login-field input.error {
+      border-color: var(--md-sys-color-error);
+    }
+    .login-error {
+      font: var(--md-sys-typescale-label-large);
+      color: var(--md-sys-color-error);
+      display: none;
+    }
+    .login-error.visible { display: block; }
+
+    .login-btn {
+      height: 48px;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      border: none; border-radius: 100px;
+      font: var(--md-sys-typescale-label-large);
+      font-size: 15px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: opacity .15s, box-shadow .15s;
+      box-shadow: var(--md-elevation-1);
+    }
+    .login-btn:hover { opacity: .92; box-shadow: var(--md-elevation-2); }
+    .login-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .login-btn .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .login-btn.loading .spinner { display: block; }
+    .login-btn.loading .btn-label { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .demo-members {
+      border-top: 1px solid var(--md-sys-color-outline-variant);
+      padding-top: 16px;
+    }
+    .demo-members p {
+      font: var(--md-sys-typescale-label-medium);
+      color: var(--md-sys-color-outline);
+      margin-bottom: 10px;
+    }
+    .demo-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .demo-chip {
+      padding: 5px 12px;
+      border: 1px solid var(--md-sys-color-outline-variant);
+      border-radius: 100px;
+      font: var(--md-sys-typescale-label-medium);
+      color: var(--md-sys-color-on-surface-variant);
+      cursor: pointer;
+      background: none;
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .demo-chip:hover {
+      border-color: var(--md-sys-color-primary);
+      background: var(--md-sys-color-primary-container);
+      color: var(--md-sys-color-primary);
+    }
+
+    /* ── Utility ──────────────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .section-label {
+      font: var(--md-sys-typescale-label-large);
+      color: var(--md-sys-color-outline);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      margin-bottom: 4px;
+    }
+    .divider { height: 1px; background: var(--md-sys-color-outline-variant); margin: 4px 0; }
+    .full-width { width: 100%; }
+  </style>
+</head>
+<body>
+
+<!-- ── Login Modal ────────────────────────────────────────────────────── -->
+<div id="login-backdrop">
+  <div id="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+
+    <div class="login-header">
+      <div class="brand-row">
+        <span class="material-symbols-rounded">tire_repair</span>
+        <h2 id="login-title">Costco Tyre Assistant</h2>
+      </div>
+      <p>Sign in with your Costco membership to get personalised tyre recommendations.</p>
+    </div>
+
+    <div class="login-body">
+      <div class="login-field">
+        <label for="member-id-input">Costco Member ID</label>
+        <input
+          id="member-id-input"
+          type="text"
+          placeholder="e.g. M10042"
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="8"
+        />
+        <span class="login-error" id="login-error-msg">
+          <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">error</span>
+          Member not found. Please check your ID and try again.
+        </span>
+      </div>
+
+      <button class="login-btn" id="login-submit-btn" onclick="submitLogin()">
+        <div class="spinner"></div>
+        <span class="btn-label">
+          <span class="material-symbols-rounded" style="font-size:18px">login</span>
+          Sign In
+        </span>
+      </button>
+
+      <div class="demo-members">
+        <p>Demo accounts — click to fill:</p>
+        <div class="demo-chips">
+          <button class="demo-chip" onclick="fillDemo('M10042')" title="Sarah Chen · Toyota Camry · Returning">M10042</button>
+          <button class="demo-chip" onclick="fillDemo('M10043')" title="James Park · Ford F-150 · Returning">M10043</button>
+          <button class="demo-chip" onclick="fillDemo('M10044')" title="Emily Torres · Honda CR-V · New buyer">M10044</button>
+          <button class="demo-chip" onclick="fillDemo('M10045')" title="David Kim · BMW 3 Series · New buyer">M10045</button>
+          <button class="demo-chip" onclick="fillDemo('M10046')" title="Lisa Wang · Toyota RAV4 · Returning">M10046</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- Top App Bar -->
+  <header id="topbar">
+    <span class="material-symbols-rounded logo">tire_repair</span>
+    <h1>Costco Tyre Assistant</h1>
+    <span class="stage-chip" id="stage-label">Enter</span>
+    <a href="/dashboard" target="_blank">
+      <span class="material-symbols-rounded">dashboard</span>
+      Dashboard
+    </a>
+  </header>
+
+  <!-- Chat feed -->
+  <main id="feed" role="log" aria-live="polite" aria-label="Chat messages"></main>
+
+  <!-- Input bar -->
+  <footer id="inputbar">
+    <button id="mic-btn" aria-label="Voice input" title="Hold to speak">
+      <span class="material-symbols-rounded" id="mic-icon">mic</span>
+    </button>
+    <textarea id="input"
+      placeholder="Type your message or Costco member ID…"
+      rows="1"
+      aria-label="Message input"
+      autocomplete="off"
+    ></textarea>
+    <button id="tts-btn" aria-label="Read last response aloud" title="Read aloud">
+      <span class="material-symbols-rounded">volume_up</span>
+    </button>
+    <button id="send-btn" aria-label="Send message">
+      <span class="material-symbols-rounded">send</span>
+    </button>
+  </footer>
+</div>
+
+<script>
+/* ── State ──────────────────────────────────────────────────────────── */
+const SESSION_ID = crypto.randomUUID();
+let stage = 'enter';
+let lastCards = [];
+let lastBookingCard = null;
+let compareVisible = false;
+let isTyping = false;
+let memberLoggedIn = false;
+
+/* ── Login Modal ─────────────────────────────────────────────────────── */
+const loginBackdrop  = document.getElementById('login-backdrop');
+const loginCard      = document.getElementById('login-card');
+const memberIdInput  = document.getElementById('member-id-input');
+const loginSubmitBtn = document.getElementById('login-submit-btn');
+const loginErrorMsg  = document.getElementById('login-error-msg');
+
+function fillDemo(id) {
+  memberIdInput.value = id;
+  memberIdInput.classList.remove('error');
+  loginErrorMsg.classList.remove('visible');
+  memberIdInput.focus();
+}
+
+function closeLoginModal() {
+  loginCard.classList.add('closing');
+  loginBackdrop.classList.add('closing');
+  setTimeout(() => {
+    loginBackdrop.style.display = 'none';
+    input.focus();
+  }, 250);
+}
+
+async function submitLogin() {
+  const memberId = memberIdInput.value.trim().toUpperCase();
+  if (!memberId) {
+    memberIdInput.classList.add('error');
+    loginErrorMsg.textContent = 'Please enter your Costco Member ID.';
+    loginErrorMsg.classList.add('visible');
+    return;
+  }
+  if (!/^M\d{4,6}$/.test(memberId)) {
+    memberIdInput.classList.add('error');
+    loginErrorMsg.textContent = 'Member IDs start with M followed by 4–6 digits (e.g. M10042).';
+    loginErrorMsg.classList.add('visible');
+    return;
+  }
+
+  // Loading state
+  loginSubmitBtn.disabled = true;
+  loginSubmitBtn.classList.add('loading');
+  memberIdInput.classList.remove('error');
+  loginErrorMsg.classList.remove('visible');
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SESSION_ID, message: memberId }),
+    });
+    const data = await res.json();
+
+    if (data.message && data.message.toLowerCase().includes("couldn't find")) {
+      // Member not found — show error in modal, stay open
+      memberIdInput.classList.add('error');
+      loginErrorMsg.textContent = `Member ID ${memberId} not found. Please check and try again.`;
+      loginErrorMsg.classList.add('visible');
+      loginSubmitBtn.disabled = false;
+      loginSubmitBtn.classList.remove('loading');
+      return;
+    }
+
+    // Success — close modal, render greeting in chat
+    memberLoggedIn = true;
+    closeLoginModal();
+
+    if (data.stage) setStage(data.stage);
+    if (data.message) { lastBotText = data.message; addBotBubble(data.message); }
+    if (data.quick_replies?.length) renderQuickReplies(data.quick_replies);
+
+  } catch (err) {
+    loginErrorMsg.textContent = 'Could not connect to the server. Make sure the server is running.';
+    loginErrorMsg.classList.add('visible');
+    loginSubmitBtn.disabled = false;
+    loginSubmitBtn.classList.remove('loading');
+  }
+}
+
+// Enter key submits the login form
+memberIdInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitLogin();
+});
+
+// Auto-uppercase and strip non-alphanumeric as user types
+memberIdInput.addEventListener('input', () => {
+  memberIdInput.value = memberIdInput.value.toUpperCase().replace(/[^M\d]/g, '');
+  memberIdInput.classList.remove('error');
+  loginErrorMsg.classList.remove('visible');
+});
+
+// Focus the input when the modal is visible
+memberIdInput.focus();
+
+/* ── DOM refs ───────────────────────────────────────────────────────── */
+const feed      = document.getElementById('feed');
+const input     = document.getElementById('input');
+const sendBtn   = document.getElementById('send-btn');
+const stageLbl  = document.getElementById('stage-label');
+
+/* ── Helpers ────────────────────────────────────────────────────────── */
+function scrollBottom() {
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function setStage(s) {
+  stage = s;
+  stageLbl.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function stars(rating) {
+  const full = Math.round(rating);
+  return '★'.repeat(full) + '☆'.repeat(5 - full);
+}
+
+function formatPrice(p) {
+  return '$' + parseFloat(p).toFixed(2);
+}
+
+function slotIcon(tag) {
+  const icons = {
+    'Top Pick': 'workspace_premium',
+    'Best Repurchase': 'refresh',
+    'Best Upgrade': 'trending_up',
+    'Most Popular': 'local_fire_department',
+    'Runner-up': 'thumb_up',
+    'Budget Alt': 'savings',
+  };
+  return icons[tag] || 'tire_repair';
+}
+
+/* ── Render: typing indicator ────────────────────────────────────────── */
+function showTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.id = 'typing-indicator';
+  row.innerHTML = `
+    <div class="avatar bot"><span class="material-symbols-rounded">support_agent</span></div>
+    <div class="bubble">
+      <div class="typing">
+        <span></span><span></span><span></span>
+      </div>
+    </div>`;
+  feed.appendChild(row);
+  scrollBottom();
+}
+
+function hideTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+/* ── Render: user message bubble ────────────────────────────────────── */
+function addUserBubble(text) {
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `
+    <div class="avatar user"><span class="material-symbols-rounded">person</span></div>
+    <div class="bubble">${escapeHtml(text)}</div>`;
+  feed.appendChild(row);
+  scrollBottom();
+}
+
+/* ── Render: bot message bubble ─────────────────────────────────────── */
+function addBotBubble(text, msgIndex) {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.innerHTML = `
+    <div class="avatar bot"><span class="material-symbols-rounded">support_agent</span></div>
+    <div class="bubble">
+      <div class="bubble-text">${escapeHtml(text)}</div>
+      <div class="bubble-actions">
+        <button class="thumb-btn" title="Helpful" onclick="sendFeedback('thumbs_up', null, 'orchestrator', this)">
+          <span class="material-symbols-rounded">thumb_up</span>
+        </button>
+        <button class="thumb-btn" title="Not helpful" onclick="sendFeedback('thumbs_down', null, 'orchestrator', this)">
+          <span class="material-symbols-rounded">thumb_down</span>
+        </button>
+      </div>
+    </div>`;
+  feed.appendChild(row);
+  scrollBottom();
+}
+
+/* ── Render: tyre cards ─────────────────────────────────────────────── */
+function renderCards(cards) {
+  if (!cards || cards.length === 0) return;
+  lastCards = cards;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'full-width';
+
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = 'Your Recommendations';
+  wrapper.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.className = 'cards-grid';
+
+  cards.forEach((card, idx) => {
+    const t = card.tyre || {};
+    const inStock = (card.stock_badge || '').includes('✅');
+
+    const el = document.createElement('div');
+    el.className = 'tyre-card';
+    el.dataset.tyreId = t.id;
+    el.dataset.idx = idx;
+
+    const promoHtml = t.active_promotion
+      ? `<div class="promo-chip"><span class="material-symbols-rounded" style="font-size:12px">local_offer</span> ${escapeHtml(t.active_promotion)}</div>`
+      : '';
+
+    const punchHtml = card.punch_line
+      ? `<div class="punch-line">"${escapeHtml(card.punch_line)}"</div>`
+      : '';
+
+    const msgHtml = card.personalised_msg
+      ? `<div class="personalised-msg">${escapeHtml(card.personalised_msg)}</div>`
+      : '';
+
+    el.innerHTML = `
+      <div class="card-header">
+        <div class="slot-tag">
+          <span class="material-symbols-rounded">${slotIcon(card.slot_tag)}</span>
+          ${escapeHtml(card.slot_tag || 'Pick')}
+        </div>
+        <div class="card-brand">${escapeHtml(t.brand || '')}</div>
+        <div class="card-model">${escapeHtml(t.model || '')}</div>
+        <div class="card-size">${escapeHtml(t.size || '')} &nbsp;·&nbsp; ${escapeHtml(t.season || '')} &nbsp;·&nbsp; ${escapeHtml(t.terrain || '')}</div>
+      </div>
+      <div class="card-body">
+        <div class="price-row">
+          <div class="member-price">${formatPrice(t.member_price || 0)}</div>
+          <div class="retail-price">${formatPrice(t.price || 0)}</div>
+          <div class="price-label">/tyre member price</div>
+        </div>
+        <div class="rating-row">
+          <span class="stars">${stars(t.rating || 0)}</span>
+          <span class="review-count">${(t.review_count || 0).toLocaleString()} reviews</span>
+        </div>
+        <span class="stock-badge ${inStock ? 'in' : 'out'}">
+          <span class="material-symbols-rounded" style="font-size:13px">${inStock ? 'check_circle' : 'cancel'}</span>
+          ${escapeHtml(card.stock_badge || '')}
+        </span>
+        ${promoHtml}
+        ${msgHtml}
+        ${punchHtml}
+        <div style="font:var(--md-sys-typescale-label-medium);color:var(--md-sys-color-outline)">
+          Tread life: ${(t.tread_life_km || 0).toLocaleString()} km &nbsp;·&nbsp; ${t.warranty_years || 0}yr warranty
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="btn-primary" id="cart-btn-${idx}" onclick="addToCart('${t.id}', '${escapeHtml(card.slot_tag || '')}', ${idx})">
+          <span class="material-symbols-rounded" style="font-size:18px">shopping_cart</span>
+          Add to Cart
+        </button>
+        <button class="btn-secondary" onclick="selectTyre('${t.id}', '${escapeHtml(card.slot_tag || '')}', ${idx})" title="View details first">
+          <span class="material-symbols-rounded" style="font-size:16px">info</span>
+          Details
+        </button>
+        <button class="btn-icon" id="like-${idx}" title="Good pick" onclick="thumbCard('${t.id}', 'thumbs_up', ${idx})">
+          <span class="material-symbols-rounded">thumb_up</span>
+        </button>
+        <button class="btn-icon" id="dislike-${idx}" title="Not for me" onclick="thumbCard('${t.id}', 'thumbs_down', ${idx})">
+          <span class="material-symbols-rounded">thumb_down</span>
+        </button>
+      </div>`;
+
+    grid.appendChild(el);
+  });
+
+  wrapper.appendChild(grid);
+
+  // Compare toggle (if 2+ cards)
+  if (cards.length >= 2) {
+    const compareRow = document.createElement('div');
+    compareRow.className = 'compare-toggle-row';
+    compareRow.innerHTML = `
+      <button class="btn-compare" onclick="toggleCompare(this)">
+        <span class="material-symbols-rounded">compare_arrows</span>
+        Compare side by side
+      </button>`;
+    wrapper.appendChild(compareRow);
+
+    const compareHolder = document.createElement('div');
+    compareHolder.id = 'compare-holder';
+    compareHolder.className = 'hidden';
+    wrapper.appendChild(compareHolder);
+  }
+
+  feed.appendChild(wrapper);
+  scrollBottom();
+}
+
+/* ── Render: comparison card ─────────────────────────────────────────── */
+async function toggleCompare(btn) {
+  const holder = document.getElementById('compare-holder');
+  if (!holder) return;
+
+  compareVisible = !compareVisible;
+  btn.querySelector('.material-symbols-rounded').textContent = compareVisible ? 'expand_less' : 'compare_arrows';
+  btn.querySelector('.material-symbols-rounded').nextSibling.textContent = compareVisible ? ' Hide comparison' : ' Compare side by side';
+
+  if (!compareVisible) { holder.className = 'hidden'; return; }
+  holder.className = '';
+
+  if (holder.children.length > 0) return; // already built
+
+  // Build comparison from lastCards data
+  const tyres = lastCards.map(c => c.tyre).filter(Boolean);
+  if (tyres.length < 2) return;
+
+  const card = document.createElement('div');
+  card.className = 'compare-card';
+
+  const header = document.createElement('div');
+  header.className = 'compare-header';
+  header.innerHTML = `<span class="material-symbols-rounded">compare_arrows</span> Side-by-Side Comparison`;
+  card.appendChild(header);
+
+  // Specs table
+  const fields = [
+    { key: 'member_price', label: 'Member Price', fmt: v => formatPrice(v) },
+    { key: 'tread_life_km', label: 'Tread Life', fmt: v => v.toLocaleString() + ' km' },
+    { key: 'noise_db', label: 'Road Noise', fmt: v => v + ' dB' },
+    { key: 'warranty_years', label: 'Warranty', fmt: v => v + ' years' },
+    { key: 'wet_grip', label: 'Wet Grip', fmt: v => v },
+    { key: 'rating', label: 'Rating', fmt: v => '★ ' + v },
+  ];
+
+  const table = document.createElement('table');
+  table.className = 'compare-table';
+
+  // Header row
+  const thead = table.createTHead();
+  const hr = thead.insertRow();
+  const th0 = document.createElement('th');
+  th0.textContent = 'Spec';
+  hr.appendChild(th0);
+  tyres.forEach(t => {
+    const th = document.createElement('th');
+    th.textContent = t.brand + ' ' + t.model;
+    hr.appendChild(th);
+  });
+
+  // Data rows
+  const tbody = table.createTBody();
+  fields.forEach(f => {
+    const row = tbody.insertRow();
+    const td0 = row.insertCell();
+    td0.className = 'cmp-label';
+    td0.textContent = f.label;
+    tyres.forEach(t => {
+      const td = row.insertCell();
+      td.textContent = f.fmt(t[f.key]);
+    });
+  });
+
+  card.appendChild(table);
+
+  // Cost per 1000 km
+  const costRow = document.createElement('div');
+  costRow.style.cssText = 'padding:10px 16px;display:flex;gap:16px;flex-wrap:wrap;border-top:1px solid var(--md-sys-color-outline-variant)';
+  tyres.forEach(t => {
+    const cpm = (t.member_price / t.tread_life_km * 1000).toFixed(3);
+    costRow.innerHTML += `
+      <div>
+        <div style="font:var(--md-sys-typescale-label-medium);color:var(--md-sys-color-outline)">${t.brand} ${t.model}</div>
+        <span class="cost-badge">$${cpm} per 1,000 km</span>
+      </div>`;
+  });
+  card.appendChild(costRow);
+
+  holder.appendChild(card);
+  scrollBottom();
+}
+
+/* ── Render: appointment slots ───────────────────────────────────────── */
+function renderBookingCard(bc) {
+  // Remove slot chips — booking is done, no more clicks allowed
+  document.querySelectorAll('.slot-chip').forEach(el => el.remove());
+  lastBookingCard = bc;  // store for downloadBooking()
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'full-width';
+
+  const card = document.createElement('div');
+  card.className = 'booking-card';
+  card.innerHTML = `
+    <div class="bc-header">
+      <div class="bc-icon"><span class="material-symbols-rounded">check_circle</span></div>
+      <div>
+        <div class="bc-title">Booking Confirmed</div>
+        <div class="bc-id">${escapeHtml(bc.booking_id)} · Order ${escapeHtml(bc.order_id)}</div>
+      </div>
+    </div>
+    <div class="bc-row">
+      <span class="bc-label">Date</span>
+      <span><strong>${escapeHtml(bc.date)}</strong> at <strong>${escapeHtml(bc.time)}</strong></span>
+    </div>
+    <div class="bc-row">
+      <span class="bc-label">Location</span>
+      <span>${escapeHtml(bc.location)}<br><small style="color:var(--md-sys-color-outline)">${escapeHtml(bc.address)}</small></span>
+    </div>
+    <div class="bc-row">
+      <span class="bc-label">Tyres</span>
+      <span>${escapeHtml(bc.tyre)}</span>
+    </div>
+    ${bc.calendar ? `<div class="bc-row"><span class="bc-label">Calendar</span><span>Invite sent to your email</span></div>` : ''}
+    <div class="bc-bring">
+      <strong>What to bring</strong>
+      <ul>${(bc.bring || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+    </div>
+    <div class="bc-bring" style="margin-top:8px; background:var(--md-sys-color-surface-variant);">
+      <strong>What happens next</strong>
+      <ul>
+        <li>SMS reminder sent the day before your appointment</li>
+        <li>Installation takes ~60 minutes</li>
+        <li>30-day satisfaction survey will be sent after install</li>
+        <li>Tyre rotation reminder at 10,000 km</li>
+      </ul>
+    </div>
+    <button class="bc-download-btn" onclick="downloadBooking()">
+      <span class="material-symbols-rounded">download</span>
+      Download Booking Confirmation
+    </button>`;
+
+  wrapper.appendChild(card);
+  feed.appendChild(wrapper);
+  scrollBottom();
+}
+
+function downloadBooking() {
+  const bc = lastBookingCard;
+  if (!bc) { alert('No booking data found.'); return; }
+  if (!window.jspdf) { alert('PDF library not loaded yet — please try again in a moment.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const PRIMARY   = [0, 104, 55];   // Costco-ish dark green
+  const DARK      = [30, 30, 30];
+  const MUTED     = [100, 100, 100];
+  const WHITE     = [255, 255, 255];
+  const BG_LIGHT  = [245, 248, 245];
+  const pageW     = 210;
+  const margin    = 20;
+  const contentW  = pageW - margin * 2;
+  let y           = 0;
+
+  // ── Header bar ────────────────────────────────────────────────────────
+  doc.setFillColor(...PRIMARY);
+  doc.rect(0, 0, pageW, 32, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('COSTCO TYRE CENTRE', margin, 13);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Booking Confirmation', margin, 22);
+  // Booking ID top-right
+  doc.setFontSize(8);
+  doc.text(bc.booking_id, pageW - margin, 22, { align: 'right' });
+  y = 42;
+
+  // ── Status badge ──────────────────────────────────────────────────────
+  doc.setFillColor(...BG_LIGHT);
+  doc.roundedRect(margin, y - 6, contentW, 14, 3, 3, 'F');
+  doc.setTextColor(...PRIMARY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('✓  Booking Confirmed', margin + 5, y + 3);
+  y += 18;
+
+  // ── Helper: section heading ────────────────────────────────────────────
+  function sectionHeading(label) {
+    doc.setDrawColor(...PRIMARY);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin + contentW, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...PRIMARY);
+    doc.text(label.toUpperCase(), margin, y);
+    y += 5;
+  }
+
+  // ── Helper: key-value row ──────────────────────────────────────────────
+  function kvRow(label, value) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    doc.text(label, margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DARK);
+    doc.text(String(value || ''), margin + 36, y);
+    y += 7;
+  }
+
+  // ── Appointment details ────────────────────────────────────────────────
+  sectionHeading('Appointment Details');
+  kvRow('Date & Time',  `${bc.date} at ${bc.time}`);
+  kvRow('Location',     bc.location);
+  kvRow('Address',      bc.address);
+  kvRow('Tyres',        bc.tyre);
+  kvRow('Order ID',     bc.order_id);
+  y += 4;
+
+  // ── What to bring ──────────────────────────────────────────────────────
+  sectionHeading('What to Bring');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...DARK);
+  (bc.bring || []).forEach(item => {
+    doc.text(`•  ${item}`, margin + 3, y);
+    y += 6;
+  });
+  y += 4;
+
+  // ── What happens next ─────────────────────────────────────────────────
+  sectionHeading('What Happens Next');
+  const next = [
+    'SMS reminder sent the day before your appointment',
+    'Installation takes approximately 60 minutes',
+    '30-day satisfaction survey sent after install',
+    'Tyre rotation reminder at 10,000 km',
+  ];
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...DARK);
+  next.forEach(item => {
+    doc.text(`•  ${item}`, margin + 3, y);
+    y += 6;
+  });
+  y += 8;
+
+  // ── Footer ────────────────────────────────────────────────────────────
+  doc.setFillColor(...PRIMARY);
+  doc.rect(0, 280, pageW, 17, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('Thank you for shopping with Costco Tyre Centre.', pageW / 2, 290, { align: 'center' });
+
+  doc.save(`Costco_Booking_${bc.booking_id}.pdf`);
+}
+
+function renderSlots(slots) {
+  if (!slots || slots.length === 0) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'full-width';
+
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = 'Suggested Slots for Your Schedule';
+  wrapper.appendChild(label);
+
+  const grid = document.createElement('div');
+  grid.className = 'slots-grid';
+
+  slots.filter(s => s.available !== false).slice(0, 6).forEach(slot => {
+    const el = document.createElement('div');
+    el.className = 'slot-chip';
+    const d = new Date(slot.date + 'T00:00:00');
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    el.innerHTML = `
+      <div class="slot-date">${escapeHtml(dateStr)}</div>
+      <div class="slot-time">${escapeHtml(slot.time)}</div>
+      <div class="slot-wait">${slot.why ? escapeHtml(slot.why) : '~' + slot.estimated_duration_mins + ' min'}</div>`;
+    el.onclick = () => bookSlot(slot, el);
+    grid.appendChild(el);
+  });
+
+  wrapper.appendChild(grid);
+  feed.appendChild(wrapper);
+  scrollBottom();
+}
+
+/* ── Render: quick-reply chips ───────────────────────────────────────── */
+function renderQuickReplies(replies) {
+  if (!replies || replies.length === 0) return;
+
+  // Remove any previous quick-reply row (only one set visible at a time)
+  const existing = document.getElementById('quick-reply-row');
+  if (existing) existing.remove();
+
+  const row = document.createElement('div');
+  row.className = 'quick-reply-row';
+  row.id = 'quick-reply-row';
+
+  replies.forEach(reply => {
+    const btn = document.createElement('button');
+    btn.className = 'qr-chip';
+    btn.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px">chat_bubble_outline</span>${escapeHtml(reply.label)}`;
+    btn.onclick = () => {
+      // Mark all chips in this row as used so they grey out
+      row.querySelectorAll('.qr-chip').forEach(c => c.classList.add('used'));
+      sendMessage(reply.message);
+    };
+    row.appendChild(btn);
+  });
+
+  feed.appendChild(row);
+  scrollBottom();
+}
+
+/* ── Render: drop recovery banner ────────────────────────────────────── */
+function renderRecovery(recovery) {
+  if (!recovery || !recovery.message || recovery.action === 'none') return;
+  const el = document.createElement('div');
+  el.className = 'recovery-banner';
+  el.innerHTML = `<span class="material-symbols-rounded">info</span> ${escapeHtml(recovery.message)}`;
+  feed.appendChild(el);
+  scrollBottom();
+}
+
+/* ── Actions ────────────────────────────────────────────────────────── */
+
+// "Add to Cart" — skips detail step, goes straight to cart
+function addToCart(tyreId, slotTag, idx) {
+  // Highlight selected card
+  document.querySelectorAll('.tyre-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.tyre-card[data-idx="${idx}"]`);
+  if (card) card.classList.add('selected');
+
+  // Disable the button so it can't be double-tapped
+  const btn = document.getElementById(`cart-btn-${idx}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px">hourglass_top</span> Adding…`;
+  }
+
+  // "add to cart <tyre-id>" — backend detects add_cart intent AND extracts tyre ID from text
+  sendMessage(`add to cart ${tyreId}`);
+}
+
+// "Details" — shows detail view, then user decides (original flow)
+function selectTyre(tyreId, slotTag, idx) {
+  document.querySelectorAll('.tyre-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.tyre-card[data-idx="${idx}"]`);
+  if (card) card.classList.add('selected');
+
+  sendMessage(`I'd like to view details for the ${slotTag} option (${tyreId})`);
+}
+
+function thumbCard(tyreId, signal, idx) {
+  sendFeedback(signal, tyreId, 'rec_ranking', null);
+  const btn = document.getElementById(signal === 'thumbs_up' ? `like-${idx}` : `dislike-${idx}`);
+  const other = document.getElementById(signal === 'thumbs_up' ? `dislike-${idx}` : `like-${idx}`);
+  if (btn) { btn.classList.add(signal === 'thumbs_up' ? 'liked' : 'disliked'); }
+  if (other) { other.classList.remove('liked', 'disliked'); }
+}
+
+function bookSlot(slot, el) {
+  // Disable ALL slot chips immediately — prevents any double-click or second booking
+  document.querySelectorAll('.slot-chip').forEach(c => {
+    c.onclick = null;
+    c.style.opacity = '0.5';
+    c.style.pointerEvents = 'none';
+  });
+  el.style.borderColor = 'var(--md-sys-color-primary)';
+  el.style.background = 'var(--md-sys-color-primary-container)';
+  el.style.opacity = '1';
+  sendMessage(`Book the slot on ${slot.date} at ${slot.time} (location ${slot.location_id})`);
+}
+
+async function sendFeedback(signal, tyreId, agent, btn) {
+  if (btn) btn.classList.add('active');
+  try {
+    await fetch('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SESSION_ID, signal, tyre_id: tyreId, agent }),
+    });
+  } catch (_) {}
+}
+
+/* ── Core: send message ─────────────────────────────────────────────── */
+async function sendMessage(text) {
+  const msg = text || input.value.trim();
+  if (!msg || isTyping) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  sendBtn.disabled = true;
+  isTyping = true;
+
+  // Dismiss any lingering quick-reply chips when the user sends a message
+  const qrRow = document.getElementById('quick-reply-row');
+  if (qrRow) { qrRow.querySelectorAll('.qr-chip').forEach(c => c.classList.add('used')); }
+
+  addUserBubble(msg);
+  showTyping();
+
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SESSION_ID, message: msg }),
+    });
+
+    hideTyping();
+    if (!res.ok) {
+      addBotBubble(`Something went wrong (${res.status}). Please try again.`);
+      isTyping = false; sendBtn.disabled = false; return;
+    }
+    const data = await res.json();
+
+    if (data.stage) setStage(data.stage);
+    if (data.message) { lastBotText = data.message; addBotBubble(data.message); }
+    if (data.quick_replies?.length) renderQuickReplies(data.quick_replies);
+    if (data.cards?.length) renderCards(data.cards);
+    if (data.appointment_slots?.length) renderSlots(data.appointment_slots);
+    if (data.booking_card) renderBookingCard(data.booking_card);
+    if (data.drop_recovery) renderRecovery(data.drop_recovery);
+
+  } catch (err) {
+    hideTyping();
+    addBotBubble("Sorry, I couldn't connect to the server. Please check that the server is running and try again.");
+  }
+
+  isTyping = false;
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+/* ── XSS safety ─────────────────────────────────────────────────────── */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ── Event listeners ────────────────────────────────────────────────── */
+sendBtn.addEventListener('click', () => sendMessage());
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-resize textarea
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+});
+
+/* ── Voice: ElevenLabs TTS + Web Speech STT ─────────────────────────── */
+const micBtn  = document.getElementById('mic-btn');
+const micIcon = document.getElementById('mic-icon');
+const ttsBtn  = document.getElementById('tts-btn');
+
+let voiceEnabled = false;
+let lastBotText  = '';
+let ttsAudio     = null;
+let recognition  = null;
+
+// Check if TTS is available on server
+async function checkVoiceStatus() {
+  try {
+    const r = await fetch('/voice/status');
+    const d = await r.json();
+    voiceEnabled = d.enabled;
+    if (voiceEnabled) {
+      ttsBtn.classList.add('visible');
+    } else {
+      micBtn.title = 'Voice disabled — set ELEVENLABS_API_KEY in .env';
+    }
+  } catch (_) {}
+}
+
+// Web Speech API — Speech-to-Text
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    micBtn.classList.add('disabled');
+    micBtn.title = 'Speech recognition not supported in this browser';
+    return;
+  }
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    micBtn.classList.add('listening');
+    micIcon.textContent = 'mic_off';
+    input.placeholder = 'Listening…';
+  };
+
+  recognition.onresult = (e) => {
+    const transcript = Array.from(e.results)
+      .map(r => r[0].transcript)
+      .join('');
+    input.value = transcript;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    if (e.results[e.results.length - 1].isFinal) {
+      stopListening();
+      sendMessage();
+    }
+  };
+
+  recognition.onerror = (e) => {
+    stopListening();
+    if (e.error !== 'no-speech') {
+      addBotBubble('Voice input error: ' + e.error + '. Try typing instead.');
+    }
+  };
+
+  recognition.onend = () => stopListening();
+}
+
+function stopListening() {
+  micBtn.classList.remove('listening');
+  micIcon.textContent = 'mic';
+  input.placeholder = 'Type your message or Costco member ID…';
+  if (recognition) { try { recognition.stop(); } catch (_) {} }
+}
+
+micBtn.addEventListener('click', () => {
+  if (micBtn.classList.contains('disabled')) return;
+  if (micBtn.classList.contains('listening')) {
+    stopListening();
+  } else {
+    if (!recognition) { initSpeechRecognition(); }
+    if (recognition) { try { recognition.start(); } catch (_) {} }
+  }
+});
+
+// ElevenLabs TTS — read last bot response aloud
+ttsBtn.addEventListener('click', async () => {
+  if (!voiceEnabled || !lastBotText) return;
+  if (ttsAudio && !ttsAudio.paused) {
+    ttsAudio.pause();
+    ttsAudio = null;
+    ttsBtn.classList.remove('playing');
+    ttsBtn.querySelector('.material-symbols-rounded').textContent = 'volume_up';
+    return;
+  }
+  ttsBtn.classList.add('playing');
+  ttsBtn.querySelector('.material-symbols-rounded').textContent = 'stop_circle';
+  try {
+    const resp = await fetch('/voice/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: lastBotText, session_id: SESSION_ID }),
+    });
+    if (!resp.ok) throw new Error('TTS failed');
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    ttsAudio   = new Audio(url);
+    ttsAudio.onended = () => {
+      ttsBtn.classList.remove('playing');
+      ttsBtn.querySelector('.material-symbols-rounded').textContent = 'volume_up';
+      URL.revokeObjectURL(url);
+    };
+    ttsAudio.play();
+  } catch (e) {
+    ttsBtn.classList.remove('playing');
+    ttsBtn.querySelector('.material-symbols-rounded').textContent = 'volume_up';
+  }
+});
+
+// lastBotText is set in sendMessage() after each response
+
+/* ── Boot: welcome message ──────────────────────────────────────────── */
+window.addEventListener('load', async () => {
+  await checkVoiceStatus();
+  initSpeechRecognition();
+  addBotBubble(
+    "Welcome to Costco Tyre Assistant!\n\n" +
+    "I'm here to help you find the perfect tyres for your vehicle.\n\n" +
+    "To get started, please enter your Costco member ID (e.g. M10042)."
+  );
+  input.focus();
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /c/Users/satti.naveen/costco-tyre-agent)",
+      "Bash(dir \"c:\\\\Users\\\\satti.naveen\\\\costco-tyre-agent\")"
+    ]
+  }
+}

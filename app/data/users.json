@@ -1,0 +1,59 @@
+[
+  {
+    "member_id": "M10042",
+    "name": "Sarah Chen",
+    "membership_tier": "executive",
+    "location": {"city": "Seattle", "zip": "98101"},
+    "vehicle": {"make": "Toyota", "model": "Camry", "year": 2020},
+    "driving_habits": ["highway", "daily commute"],
+    "last_purchase": {
+      "tyre_id": "BRI-TUR-20555R16",
+      "date": "2024-09-15",
+      "mileage_at_purchase": 34200
+    }
+  },
+  {
+    "member_id": "M10043",
+    "name": "James Park",
+    "membership_tier": "gold",
+    "location": {"city": "Portland", "zip": "97201"},
+    "vehicle": {"make": "Ford", "model": "F-150", "year": 2021},
+    "driving_habits": ["highway", "off-road", "towing"],
+    "last_purchase": {
+      "tyre_id": "GYR-WRNG-23565R17",
+      "date": "2023-11-08",
+      "mileage_at_purchase": 22500
+    }
+  },
+  {
+    "member_id": "M10044",
+    "name": "Emily Torres",
+    "membership_tier": "executive",
+    "location": {"city": "San Francisco", "zip": "94102"},
+    "vehicle": {"make": "Honda", "model": "CR-V", "year": 2022},
+    "driving_habits": ["city", "highway", "weekend trips"],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10045",
+    "name": "David Kim",
+    "membership_tier": "gold",
+    "location": {"city": "Los Angeles", "zip": "90001"},
+    "vehicle": {"make": "BMW", "model": "3 Series", "year": 2022},
+    "driving_habits": ["highway", "spirited driving"],
+    "last_purchase": null
+  },
+  {
+    "member_id": "M10046",
+    "name": "Lisa Wang",
+    "membership_tier": "standard",
+    "location": {"city": "Phoenix", "zip": "85001"},
+    "vehicle": {"make": "Toyota", "model": "RAV4", "year": 2019},
+    "driving_habits": ["highway", "city", "light off-road"],
+    "last_purchase": {
+      "tyre_id": "CON-CTXS-23565R17",
+      "date": "2024-03-22",
+      "mileage_at_purchase": 41800
+    }
+  }
+]

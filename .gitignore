@@ -1,0 +1,56 @@
+# ── Secrets — NEVER commit these ──────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ── Python runtime ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ── Virtual environments ───────────────────────────────────────────────────
+costco-tyres/
+venv/
+.venv/
+env/
+ENV/
+
+# ── Build / dist ───────────────────────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ── App runtime logs (contain session data — not for version control) ──────
+app/logs/guardrail.json
+app/logs/feedback.json
+app/logs/funnel.json
+# Keep the .gitkeep so the logs/ directory exists in the repo
+!app/logs/.gitkeep
+
+# ── Runtime appointments (written at run time — reset with /reset-data) ────
+# NOTE: app/data/appointments.json starts as [] and is fine to commit.
+#       Uncomment below if you don't want runtime bookings tracked in git.
+# app/data/appointments.json
+
+# ── IDE / editor ───────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Testing ────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+*.xml
+
+# ── Type checking / linting ────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/

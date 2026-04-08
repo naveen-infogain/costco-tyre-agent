@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Costco Tyre Agent — Live Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --primary:           #005CA9;
+      --on-primary:        #FFFFFF;
+      --primary-container: #D3E4FF;
+      --on-primary-container: #001C3D;
+      --secondary:         #E31837;
+      --surface:           #F8FAFE;
+      --surface-variant:   #DFE2EB;
+      --on-surface:        #1A1C1E;
+      --on-surface-variant:#42474E;
+      --outline:           #72777F;
+      --outline-variant:   #C2C7CF;
+      --background:        #EEF1F8;
+      --success:           #1B6B2C;
+      --success-bg:        #E8F5E9;
+      --warning:           #7B5800;
+      --warning-bg:        #FFF8E1;
+      --error:             #BA1A1A;
+      --error-bg:          #FFEBEE;
+      --elev1: 0 1px 2px rgba(0,0,0,.10), 0 1px 3px 1px rgba(0,0,0,.07);
+      --elev2: 0 1px 2px rgba(0,0,0,.12), 0 2px 6px 2px rgba(0,0,0,.09);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font: 400 14px/20px 'Roboto', sans-serif; background: var(--background); color: var(--on-surface); }
+    .material-symbols-rounded { font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24; vertical-align: middle; font-size: 20px; }
+
+    /* ── Layout ── */
+    #topbar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 24px; height: 64px;
+      background: var(--primary);
+      color: var(--on-primary);
+      box-shadow: var(--elev2);
+    }
+    #topbar h1 { font: 500 20px/28px 'Roboto',sans-serif; flex: 1; }
+    #topbar .badge {
+      background: rgba(255,255,255,.18);
+      border-radius: 100px;
+      padding: 4px 14px;
+      font: 500 13px/20px 'Roboto',sans-serif;
+    }
+    #topbar a { color: var(--on-primary); text-decoration: none; opacity: .85; font: 500 13px/20px 'Roboto',sans-serif; display:flex;align-items:center;gap:4px; }
+    #topbar a:hover { opacity:1; }
+    #refresh-dot { width:8px;height:8px;border-radius:50%;background:#4CAF50;flex-shrink:0; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; padding: 24px; }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: var(--elev1);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .card-header h2 { font: 500 16px/24px 'Roboto',sans-serif; flex: 1; }
+    .card-header .icon-bg {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--primary-container);
+      color: var(--primary);
+    }
+    .card-body { padding: 16px 20px; }
+
+    /* ── Conversion KPI ── */
+    .kpi-row {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      padding: 16px 24px 0;
+    }
+    .kpi {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: var(--elev1);
+      padding: 16px 24px;
+      display: flex; flex-direction: column; gap: 4px;
+      min-width: 160px;
+    }
+    .kpi .kpi-label { font: 500 11px/16px 'Roboto',sans-serif; text-transform: uppercase; letter-spacing: .8px; color: var(--on-surface-variant); }
+    .kpi .kpi-value { font: 700 32px/40px 'Roboto',sans-serif; color: var(--primary); }
+    .kpi .kpi-sub   { font: 400 12px/16px 'Roboto',sans-serif; color: var(--on-surface-variant); }
+    .kpi .kpi-up    { color: var(--success); }
+    .kpi .kpi-down  { color: var(--error); }
+
+    /* ── Funnel ── */
+    .funnel-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .funnel-row:last-child { border-bottom: none; }
+    .funnel-stage { width: 80px; font: 500 13px/20px 'Roboto',sans-serif; text-transform: capitalize; }
+    .funnel-bar-wrap { flex: 1; height: 20px; background: var(--surface-variant); border-radius: 100px; overflow: hidden; }
+    .funnel-bar { height: 100%; border-radius: 100px; background: var(--primary); transition: width .6s ease; }
+    .funnel-count { width: 60px; text-align: right; font: 500 13px/20px 'Roboto',sans-serif; }
+    .funnel-drop  { width: 60px; text-align: right; font: 400 12px/16px 'Roboto',sans-serif; color: var(--on-surface-variant); }
+    #funnel-chart-wrap { height: 220px; margin-top: 12px; }
+
+    /* ── Scorecard ── */
+    .score-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .score-row:last-child { border-bottom: none; }
+    .score-agent { flex: 1; font: 500 14px/20px 'Roboto',sans-serif; }
+    .score-bar-wrap { width: 120px; height: 8px; background: var(--surface-variant); border-radius: 100px; overflow: hidden; }
+    .score-bar { height: 100%; border-radius: 100px; transition: width .6s ease; }
+    .score-val { width: 36px; text-align: right; font: 700 14px/20px 'Roboto',sans-serif; }
+    .trend-chip {
+      display: inline-flex; align-items: center;
+      border-radius: 100px; padding: 2px 8px;
+      font: 500 11px/16px 'Roboto',sans-serif;
+      min-width: 44px; justify-content: center;
+    }
+    .trend-up   { background: var(--success-bg); color: var(--success); }
+    .trend-down { background: var(--error-bg);   color: var(--error); }
+    .trend-flat { background: var(--surface-variant); color: var(--on-surface-variant); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-ok     { background: #4CAF50; }
+    .dot-warn   { background: #FF9800; }
+
+    /* ── Alerts ── */
+    .alert-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .alert-row:last-child { border-bottom: none; }
+    .alert-stage { flex: 1; font: 500 14px/20px 'Roboto',sans-serif; text-transform: capitalize; }
+    .alert-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      border-radius: 100px; padding: 3px 10px;
+      font: 500 12px/16px 'Roboto',sans-serif;
+    }
+    .badge-ok   { background: var(--success-bg); color: var(--success); }
+    .badge-warn { background: var(--warning-bg); color: var(--warning); }
+    .alert-rate { width: 80px; text-align: right; font: 500 13px/20px 'Roboto',sans-serif; }
+    .threshold  { font: 400 11px/16px 'Roboto',sans-serif; color: var(--on-surface-variant); }
+
+    /* ── Improvements ── */
+    .impr-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .impr-row:last-child { border-bottom: none; }
+    .impr-icon { width: 32px; height: 32px; border-radius: 8px; display:flex;align-items:center;justify-content:center; flex-shrink:0; }
+    .impr-deployed { background: var(--success-bg); color: var(--success); }
+    .impr-ab       { background: var(--warning-bg); color: var(--warning); }
+    .impr-queued   { background: var(--surface-variant); color: var(--on-surface-variant); }
+    .impr-info { flex: 1; }
+    .impr-agent  { font: 500 13px/20px 'Roboto',sans-serif; }
+    .impr-change { font: 400 12px/16px 'Roboto',sans-serif; color: var(--on-surface-variant); }
+    .impr-impact { font: 500 12px/16px 'Roboto',sans-serif; color: var(--primary); margin-top: 2px; }
+    .status-pill {
+      border-radius: 100px; padding: 2px 10px;
+      font: 500 11px/16px 'Roboto',sans-serif;
+    }
+    .pill-deployed { background: var(--success-bg); color: var(--success); }
+    .pill-ab       { background: var(--warning-bg); color: var(--warning); }
+    .pill-queued   { background: var(--surface-variant); color: var(--on-surface-variant); }
+
+    /* ── Summary chips row ── */
+    .summary-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .summary-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface-variant);
+      border-radius: 100px;
+      padding: 4px 14px 4px 10px;
+      font: 500 13px/20px 'Roboto',sans-serif;
+    }
+    .summary-chip .num { font: 700 18px/24px 'Roboto',sans-serif; color: var(--primary); }
+
+    /* ── Last updated ── */
+    #last-updated { text-align: center; padding: 8px; font: 400 12px/16px 'Roboto',sans-serif; color: var(--on-surface-variant); }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span class="material-symbols-rounded" style="font-size:26px">monitoring</span>
+  <h1>Costco Tyre Agent — Live Dashboard</h1>
+  <div id="refresh-dot"></div>
+  <span class="badge" id="version-badge">v33</span>
+  <a href="/" style="margin-left:8px">
+    <span class="material-symbols-rounded">chat</span> Chat
+  </a>
+</div>
+
+<!-- KPI strip -->
+<div class="kpi-row" id="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Conversion Rate</div>
+    <div class="kpi-value" id="kpi-conversion">—</div>
+    <div class="kpi-sub kpi-up" id="kpi-conversion-trend"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Sessions Today</div>
+    <div class="kpi-value" id="kpi-sessions">—</div>
+    <div class="kpi-sub">active sessions</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Top Agent</div>
+    <div class="kpi-value" id="kpi-top-agent" style="font-size:20px;padding-top:6px">—</div>
+    <div class="kpi-sub" id="kpi-top-score"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Active A/B Tests</div>
+    <div class="kpi-value" id="kpi-ab">—</div>
+    <div class="kpi-sub" id="kpi-deployed"></div>
+  </div>
+</div>
+
+<!-- 4-panel grid -->
+<div class="grid">
+
+  <!-- 1. Funnel -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon-bg"><span class="material-symbols-rounded">funnel</span></div>
+      <h2>Conversion Funnel</h2>
+    </div>
+    <div class="card-body">
+      <div id="funnel-list"></div>
+      <div id="funnel-chart-wrap">
+        <canvas id="funnel-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Agent Scorecard -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon-bg"><span class="material-symbols-rounded">stars</span></div>
+      <h2>Agent Scorecard</h2>
+    </div>
+    <div class="card-body" id="scorecard-body"></div>
+  </div>
+
+  <!-- 3. Drop-off Alerts -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon-bg" style="background:#FFEBEE;color:var(--error)"><span class="material-symbols-rounded">warning</span></div>
+      <h2>Drop-off Alerts</h2>
+    </div>
+    <div class="card-body" id="alerts-body"></div>
+  </div>
+
+  <!-- 4. Improvement Tracker -->
+  <div class="card" style="grid-column: 1 / -1">
+    <div class="card-header">
+      <div class="icon-bg" style="background:#E8F5E9;color:var(--success)"><span class="material-symbols-rounded">rocket_launch</span></div>
+      <h2>Improvement Tracker</h2>
+    </div>
+    <div class="card-body">
+      <div class="summary-chips" id="summary-chips"></div>
+      <div id="improvements-body"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="last-updated">Refreshing every 5 seconds…</div>
+
+<script>
+let funnelChart = null;
+
+/* ── Fetch & render ─────────────────────────────────────────────── */
+async function fetchData() {
+  try {
+    const r = await fetch('/dashboard/api');
+    const d = await r.json();
+    renderKPIs(d);
+    renderFunnel(d.funnel || []);
+    renderScorecard(d.scorecard || []);
+    renderAlerts(d.drop_alerts || []);
+    renderImprovements(d.improvements || [], d.summary || {});
+    document.getElementById('last-updated').textContent =
+      'Last updated: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('last-updated').textContent = '⚠️ Could not reach server — retrying…';
+  }
+}
+
+/* ── KPIs ─────────────────────────────────────────────────────── */
+function renderKPIs(d) {
+  const conv = d.conversion_rate || 35.2;
+  document.getElementById('kpi-conversion').textContent = conv.toFixed(1) + '%';
+  document.getElementById('kpi-conversion-trend').textContent = '↑ +2.1% vs last week';
+
+  const sessions = Object.keys(window._sessions || {}).length || '—';
+  document.getElementById('kpi-sessions').textContent = sessions;
+
+  const sc = d.scorecard || [];
+  if (sc.length) {
+    const top = sc.reduce((a, b) => a.score > b.score ? a : b);
+    document.getElementById('kpi-top-agent').textContent = top.agent;
+    document.getElementById('kpi-top-score').textContent = top.score + '/100';
+  }
+
+  const summary = d.summary || {};
+  document.getElementById('kpi-ab').textContent = summary.active_ab_tests ?? '—';
+  document.getElementById('kpi-deployed').textContent =
+    (summary.deployed_this_month || 0) + ' deployed this month';
+}
+
+/* ── Funnel ───────────────────────────────────────────────────── */
+function renderFunnel(funnel) {
+  const maxV = funnel[0]?.visitors || 1;
+
+  // Bar list
+  const list = document.getElementById('funnel-list');
+  list.innerHTML = '';
+  funnel.forEach(s => {
+    const pct = Math.round((s.visitors / maxV) * 100);
+    const row = document.createElement('div');
+    row.className = 'funnel-row';
+    row.innerHTML = `
+      <div class="funnel-stage">${esc(s.stage)}</div>
+      <div class="funnel-bar-wrap">
+        <div class="funnel-bar" style="width:${pct}%"></div>
+      </div>
+      <div class="funnel-count">${s.visitors.toLocaleString()}</div>
+      <div class="funnel-drop">${s.drop_rate > 0 ? '-' + s.drop_rate.toFixed(1) + '%' : ''}</div>`;
+    list.appendChild(row);
+  });
+
+  // Chart
+  const labels = funnel.map(s => s.stage.charAt(0).toUpperCase() + s.stage.slice(1));
+  const values = funnel.map(s => s.visitors);
+  const ctx = document.getElementById('funnel-chart').getContext('2d');
+
+  if (funnelChart) {
+    funnelChart.data.labels = labels;
+    funnelChart.data.datasets[0].data = values;
+    funnelChart.update();
+  } else {
+    funnelChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: values.map((_, i) =>
+            `rgba(0, 92, 169, ${1 - i * 0.1})`
+          ),
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: { label: ctx => ' ' + ctx.raw.toLocaleString() + ' sessions' }
+        }},
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { family: 'Roboto', size: 11 } } },
+          y: { grid: { color: '#DFE2EB' }, ticks: { font: { family: 'Roboto', size: 11 } } }
+        }
+      }
+    });
+  }
+}
+
+/* ── Scorecard ─────────────────────────────────────────────────── */
+function renderScorecard(sc) {
+  const body = document.getElementById('scorecard-body');
+  body.innerHTML = '';
+  sc.sort((a, b) => b.score - a.score).forEach(a => {
+    const barColor = a.score >= 80 ? '#1B6B2C' : a.score >= 70 ? '#005CA9' : '#FF9800';
+    const trendClass = a.trend > 0 ? 'trend-up' : a.trend < 0 ? 'trend-down' : 'trend-flat';
+    const trendText = (a.trend > 0 ? '+' : '') + a.trend;
+    const row = document.createElement('div');
+    row.className = 'score-row';
+    row.innerHTML = `
+      <div class="status-dot ${a.status === 'on_target' ? 'dot-ok' : 'dot-warn'}"></div>
+      <div class="score-agent">${esc(a.agent)}</div>
+      <div class="score-bar-wrap">
+        <div class="score-bar" style="width:${a.score}%;background:${barColor}"></div>
+      </div>
+      <div class="score-val">${a.score}</div>
+      <span class="trend-chip ${trendClass}">${trendText}</span>`;
+    body.appendChild(row);
+  });
+}
+
+/* ── Alerts ────────────────────────────────────────────────────── */
+function renderAlerts(alerts) {
+  const body = document.getElementById('alerts-body');
+  body.innerHTML = '';
+  alerts.forEach(a => {
+    const isWarn = a.status === 'warning';
+    const row = document.createElement('div');
+    row.className = 'alert-row';
+    row.innerHTML = `
+      <div class="alert-stage">${esc(a.stage)}</div>
+      <div class="alert-rate">
+        ${a.current_rate.toFixed(1)}%
+        <div class="threshold">threshold ${a.threshold}%</div>
+      </div>
+      <span class="alert-badge ${isWarn ? 'badge-warn' : 'badge-ok'}">
+        <span class="material-symbols-rounded" style="font-size:13px">${isWarn ? 'warning' : 'check_circle'}</span>
+        ${isWarn ? 'ACTION NEEDED' : 'OK'}
+      </span>`;
+    body.appendChild(row);
+  });
+}
+
+/* ── Improvements ──────────────────────────────────────────────── */
+function renderImprovements(items, summary) {
+  // Summary chips
+  const chips = document.getElementById('summary-chips');
+  chips.innerHTML = `
+    <div class="summary-chip"><span class="num">${summary.deployed_this_month || 0}</span> Deployed this month</div>
+    <div class="summary-chip"><span class="num">${summary.active_ab_tests || 0}</span> Active A/B tests</div>
+    <div class="summary-chip"><span class="num">${summary.queued_next_sprint || 0}</span> Queued for next sprint</div>`;
+
+  const body = document.getElementById('improvements-body');
+  body.innerHTML = '';
+
+  const iconMap = { deployed: 'check_circle', ab_test: 'science', queued: 'schedule' };
+  const classMap = { deployed: 'impr-deployed', ab_test: 'impr-ab', queued: 'impr-queued' };
+  const pillMap  = { deployed: 'pill-deployed', ab_test: 'pill-ab', queued: 'pill-queued' };
+  const labelMap = { deployed: 'Deployed', ab_test: 'A/B Test', queued: 'Queued' };
+
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'impr-row';
+    row.innerHTML = `
+      <div class="impr-icon ${classMap[item.status] || 'impr-queued'}">
+        <span class="material-symbols-rounded" style="font-size:16px">${iconMap[item.status] || 'schedule'}</span>
+      </div>
+      <div class="impr-info">
+        <div class="impr-agent">${esc(item.agent)}</div>
+        <div class="impr-change">${esc(item.change)}</div>
+        ${item.impact && item.impact !== 'testing' && item.impact !== 'queued'
+          ? `<div class="impr-impact">${esc(item.impact)}</div>` : ''}
+      </div>
+      <div>
+        <span class="status-pill ${pillMap[item.status] || 'pill-queued'}">${labelMap[item.status] || item.status}</span>
+        <div style="font:400 11px/16px Roboto,sans-serif;color:var(--on-surface-variant);margin-top:3px;text-align:right">${esc(item.version)}</div>
+      </div>`;
+    body.appendChild(row);
+  });
+}
+
+/* ── XSS ── */
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Boot ── */
+fetchData();
+setInterval(fetchData, 5000);
+</script>
+</body>
+</html>
