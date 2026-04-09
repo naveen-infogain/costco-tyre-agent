@@ -3,7 +3,7 @@ import { useRef, useEffect } from 'react'
 export default function ChatInput({
   onSend, onSendImage, isTyping,
   sttSupported, isListening, isTtsPlaying, interimText,
-  onToggleMic,
+  onToggleMic, onFocus,
 }) {
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -68,8 +68,9 @@ export default function ChatInput({
         autoComplete="off"
         onKeyDown={handleKeyDown}
         onInput={autoResize}
+        onFocus={onFocus}
         disabled={isTyping}
-        readOnly={isListening}   // prevent manual typing while mic is on
+        readOnly={isListening}
       />
 
       <div className="ta-input-pill">
