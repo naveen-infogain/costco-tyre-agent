@@ -11,10 +11,17 @@ YELLOW="\033[33m"
 RED="\033[31m"
 RESET="\033[0m"
 
-ok()   { echo -e "${GREEN}✔ $1${RESET}"; }
-warn() { echo -e "${YELLOW}⚠ $1${RESET}"; }
+ok()   { echo -e "${GREEN}✔${RESET} $1"; }
+warn() { echo -e "${YELLOW}⚠${RESET} $1"; }
 fail() { echo -e "${RED}✘ $1${RESET}"; exit 1; }
 info() { echo -e "${BOLD}▶ $1${RESET}"; }
+
+# DB config — used throughout this script
+DB_CONTAINER="tireassist-postgres"
+DB_NAME="costco_tyre"
+DB_USER="postgres"
+DB_PASS="postgres"
+DB_PORT="5432"
 
 echo ""
 echo -e "${BOLD}=============================================${RESET}"
@@ -23,176 +30,254 @@ echo -e "${BOLD}=============================================${RESET}"
 echo ""
 
 # =============================================================================
-# STEP 1 — Check prerequisites
+# STEP 1 — Prerequisites
 # =============================================================================
-info "Checking prerequisites..."
+info "Step 1 — Checking prerequisites..."
 
 # Python 3.11+
 if command -v python3 &>/dev/null; then
+    PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
+    PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
     PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    PY_MAJOR=$(echo $PY_VER | cut -d. -f1)
-    PY_MINOR=$(echo $PY_VER | cut -d. -f2)
     if [ "$PY_MAJOR" -ge 3 ] && [ "$PY_MINOR" -ge 11 ]; then
         ok "Python $PY_VER"
     else
-        warn "Python $PY_VER found — need 3.11+. Installing..."
+        warn "Python $PY_VER found — installing 3.11..."
         sudo apt-get update -qq
         sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
         sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-        ok "Python 3.11 installed"
     fi
 else
-    warn "Python3 not found. Installing..."
+    warn "Python3 not found — installing..."
     sudo apt-get update -qq
     sudo apt-get install -y python3.11 python3.11-venv python3.11-dev
-    ok "Python 3.11 installed"
 fi
+
+if ! python3 -m venv --help &>/dev/null 2>&1; then
+    sudo apt-get install -y python3.11-venv
+fi
+ok "Python $(python3 --version)"
 
 # pip
 if ! command -v pip3 &>/dev/null; then
-    warn "pip not found. Installing..."
     sudo apt-get install -y python3-pip
 fi
-ok "pip $(pip3 --version | awk '{print $2}')"
+ok "pip ready"
 
 # Node.js 18+
 if command -v node &>/dev/null; then
-    NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
-    if [ "$NODE_VER" -ge 18 ]; then
-        ok "Node.js $(node -v)"
-    else
-        warn "Node.js $(node -v) found — need 18+. Upgrading..."
+    NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
+    if [ "$NODE_MAJOR" -lt 18 ]; then
+        warn "Node.js $(node -v) too old — upgrading to Node 20..."
         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         sudo apt-get install -y nodejs
-        ok "Node.js $(node -v)"
     fi
 else
-    warn "Node.js not found. Installing Node 20..."
+    warn "Node.js not found — installing Node 20..."
+    sudo apt-get install -y curl
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt-get install -y nodejs
-    ok "Node.js $(node -v)"
 fi
+ok "Node.js $(node -v)"
 
-# npm
-ok "npm $(npm -v)"
-
-# git
-if ! command -v git &>/dev/null; then
-    warn "git not found. Installing..."
-    sudo apt-get install -y git
+# Docker
+if ! command -v docker &>/dev/null; then
+    fail "Docker not found. Install it: sudo apt install docker.io && sudo systemctl start docker"
 fi
-ok "git $(git --version | awk '{print $3}')"
+if ! docker info &>/dev/null 2>&1; then
+    fail "Docker daemon not running. Start it: sudo systemctl start docker"
+fi
+ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 
 echo ""
 
 # =============================================================================
-# STEP 2 — Check .env file
+# STEP 2 — .env file
 # =============================================================================
-info "Checking environment configuration..."
+info "Step 2 — Environment configuration..."
 
 if [ ! -f ".env" ]; then
-    if [ -f ".env.example" ]; then
-        cp .env.example .env
-        warn ".env created from .env.example — YOU MUST ADD YOUR API KEYS before the app will work"
-        warn "Edit .env and add: ANTHROPIC_API_KEY=sk-ant-..."
-    else
-        fail ".env file missing and no .env.example found"
-    fi
-else
-    ok ".env file exists"
+    cp .env.example .env
+    warn ".env created from .env.example"
 fi
 
 # Check required key
-if grep -q "^ANTHROPIC_API_KEY=sk-ant-" .env; then
-    ok "ANTHROPIC_API_KEY is set"
-elif grep -q "^ANTHROPIC_API_KEY=" .env; then
-    warn "ANTHROPIC_API_KEY is in .env but appears to be placeholder — app will fail at runtime"
-else
-    fail "ANTHROPIC_API_KEY not found in .env — required"
+if ! grep -q "^ANTHROPIC_API_KEY=sk-ant-" .env 2>/dev/null; then
+    echo ""
+    echo -e "${RED}ANTHROPIC_API_KEY is missing or not set in .env${RESET}"
+    echo "  Open .env and add your key:  ANTHROPIC_API_KEY=sk-ant-..."
+    echo ""
+    read -p "Press Enter after you've added it (or Ctrl+C to abort)..." _
 fi
 
-# Optional keys
-if grep -q "^ELEVENLABS_API_KEY=sk_" .env; then
-    ok "ELEVENLABS_API_KEY set (voice enabled)"
-else
-    warn "ELEVENLABS_API_KEY not set — voice TTS disabled (chat still works)"
-fi
+# Inject DB settings into .env (overwrite if already present)
+update_env() {
+    local key="$1" val="$2"
+    if grep -q "^${key}=" .env 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${val}|" .env
+    else
+        echo "${key}=${val}" >> .env
+    fi
+}
 
-if grep -q "^TWILIO_ACCOUNT_SID=AC" .env; then
-    ok "TWILIO credentials set (WhatsApp enabled)"
-else
-    warn "TWILIO_* not set — WhatsApp booking message disabled (booking still works)"
-fi
+update_env "DB_HOST"     "localhost"
+update_env "DB_PORT"     "$DB_PORT"
+update_env "DB_NAME"     "$DB_NAME"
+update_env "DB_USER"     "$DB_USER"
+update_env "DB_PASSWORD" "$DB_PASS"
 
+ok ".env DB settings configured"
 echo ""
 
 # =============================================================================
-# STEP 3 — Python virtual environment + dependencies
+# STEP 3 — PostgreSQL via Docker
 # =============================================================================
-info "Setting up Python virtual environment..."
+info "Step 3 — Starting PostgreSQL in Docker..."
+
+# If port 5432 is already taken, use 5433 and update .env
+if ss -tuln 2>/dev/null | grep -q ":5432 "; then
+    warn "Port 5432 in use — using 5433 for Docker Postgres"
+    DB_PORT="5433"
+    update_env "DB_PORT" "5433"
+fi
+
+# Remove existing stopped container with same name (if any)
+if docker ps -a --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
+    STATUS=$(docker inspect -f '{{.State.Status}}' "$DB_CONTAINER")
+    if [ "$STATUS" = "running" ]; then
+        ok "Postgres container '$DB_CONTAINER' already running"
+    else
+        warn "Removing stopped container '$DB_CONTAINER'..."
+        docker rm "$DB_CONTAINER"
+        STATUS="gone"
+    fi
+else
+    STATUS="gone"
+fi
+
+if [ "$STATUS" != "running" ]; then
+    docker run -d \
+        --name "$DB_CONTAINER" \
+        -e POSTGRES_USER="$DB_USER" \
+        -e POSTGRES_PASSWORD="$DB_PASS" \
+        -e POSTGRES_DB="$DB_NAME" \
+        -p "${DB_PORT}:5432" \
+        --restart unless-stopped \
+        postgres:15-alpine
+    ok "Postgres container started"
+fi
+
+# Wait until Postgres is ready to accept connections
+info "Waiting for Postgres to be ready..."
+RETRIES=20
+until docker exec "$DB_CONTAINER" pg_isready -U "$DB_USER" -d "$DB_NAME" -q 2>/dev/null; do
+    RETRIES=$((RETRIES-1))
+    if [ "$RETRIES" -eq 0 ]; then
+        fail "Postgres did not become ready in time. Check: docker logs $DB_CONTAINER"
+    fi
+    sleep 1
+done
+ok "PostgreSQL is ready on port $DB_PORT"
+echo ""
+
+# =============================================================================
+# STEP 4 — Python virtual environment + dependencies
+# =============================================================================
+info "Step 4 — Python virtual environment..."
 
 if [ ! -d "venv" ]; then
     python3 -m venv venv
-    ok "Virtual environment created at ./venv"
+    ok "Virtual environment created"
 else
     ok "Virtual environment already exists"
 fi
 
 source venv/bin/activate
-ok "Virtual environment activated"
 
 info "Installing Python dependencies..."
 pip install --upgrade pip -q
 pip install -r requirements.txt -q
-ok "Python dependencies installed"
-
+ok "Python packages installed"
 echo ""
 
 # =============================================================================
-# STEP 4 — Build React frontend
+# STEP 5 — Initialise DB schema + load data
 # =============================================================================
-info "Building React frontend..."
+info "Step 5 — Initialising database schema and loading data..."
+
+# Check if CRM CSV files exist
+if [ -f "app/crm_data/Costco_Product__c-4_8_2026.csv" ]; then
+    python scripts/init_db.py
+    ok "Database schema created and CRM data loaded"
+else
+    warn "CRM CSV files not found in app/crm_data/ — running schema-only init"
+    # Run just the CREATE TABLE part without the loaders
+    python - <<'PYEOF'
+import os, sys
+sys.path.insert(0, ".")
+from dotenv import load_dotenv
+load_dotenv()
+import psycopg2
+
+conn = psycopg2.connect(
+    host=os.environ["DB_HOST"],
+    port=int(os.environ["DB_PORT"]),
+    dbname=os.environ["DB_NAME"],
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
+)
+# Read schema SQL from init_db.py
+import importlib.util, inspect
+spec = importlib.util.spec_from_file_location("init_db", "scripts/init_db.py")
+mod = importlib.util.load_from_spec(spec)
+spec.loader.exec_module(mod)
+with conn:
+    with conn.cursor() as cur:
+        cur.execute(mod.CREATE_SQL)
+conn.close()
+print("  Schema tables created successfully")
+PYEOF
+    ok "Database schema created (no CRM data — app will use JSON fallback)"
+fi
+echo ""
+
+# =============================================================================
+# STEP 6 — Build React frontend
+# =============================================================================
+info "Step 6 — Building React frontend..."
 
 cd frontend
-
 if [ ! -d "node_modules" ]; then
-    info "Installing npm packages..."
     npm install --silent
     ok "npm packages installed"
 else
-    ok "node_modules already present"
+    ok "node_modules present"
 fi
-
 npm run build --silent
-ok "React build complete → frontend/dist/"
-
+ok "React build → frontend/dist/"
 cd ..
 
-echo ""
-
-# =============================================================================
-# STEP 5 — Verify build output
-# =============================================================================
-info "Verifying build output..."
-
-if [ -f "frontend/dist/index.html" ]; then
-    ok "frontend/dist/index.html exists"
-else
+if [ ! -f "frontend/dist/index.html" ]; then
     fail "React build failed — frontend/dist/index.html not found"
 fi
-
 echo ""
 
 # =============================================================================
-# STEP 6 — Start the server
+# STEP 7 — Launch
 # =============================================================================
-info "Starting TireAssist backend on port 8000..."
+HOST_IP=$(hostname -I | awk '{print $1}')
+
 echo ""
-echo -e "${BOLD}  Access the app at:  http://$(hostname -I | awk '{print $1}'):8000${RESET}"
-echo -e "${BOLD}  Health check:       http://$(hostname -I | awk '{print $1}'):8000/health${RESET}"
-echo -e "${BOLD}  Dashboard:          http://$(hostname -I | awk '{print $1}'):8000/dashboard${RESET}"
+echo -e "${GREEN}${BOLD}=============================================${RESET}"
+echo -e "${GREEN}${BOLD}  Deployment complete!${RESET}"
+echo -e "${GREEN}${BOLD}=============================================${RESET}"
 echo ""
-echo "  Press Ctrl+C to stop."
+echo -e "  App:        ${BOLD}http://${HOST_IP}:8000${RESET}"
+echo -e "  Health:     http://${HOST_IP}:8000/health"
+echo -e "  Dashboard:  http://${HOST_IP}:8000/dashboard"
+echo -e "  Postgres:   localhost:${DB_PORT}  db=${DB_NAME}  user=${DB_USER}"
+echo ""
+echo "  Press Ctrl+C to stop the server."
 echo ""
 
 source venv/bin/activate

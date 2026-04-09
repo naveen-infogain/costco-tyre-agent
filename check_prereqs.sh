@@ -119,16 +119,37 @@ else
 fi
 echo ""
 
+# ── Docker ───────────────────────────────────────────────────────────────────
+echo -e "${BOLD}Docker${RESET}"
+if command -v docker &>/dev/null; then
+    ok "docker $(docker --version | awk '{print $3}' | tr -d ',')"
+    if docker info &>/dev/null 2>&1; then
+        ok "Docker daemon is running"
+    else
+        fail "Docker installed but daemon not running  →  sudo systemctl start docker"
+        ISSUES=$((ISSUES+1))
+    fi
+else
+    fail "Docker not found  →  sudo apt install docker.io && sudo systemctl start docker"
+    ISSUES=$((ISSUES+1))
+fi
+echo ""
+
 # ── Ports ────────────────────────────────────────────────────────────────────
 echo -e "${BOLD}Ports${RESET}"
 if command -v ss &>/dev/null; then
     if ss -tuln | grep -q ":8000 "; then
-        warn "Port 8000 is already in use — stop the existing process before deploying"
+        warn "Port 8000 already in use  →  sudo fuser -k 8000/tcp"
     else
         ok "Port 8000 is free"
     fi
+    if ss -tuln | grep -q ":5432 "; then
+        warn "Port 5432 already in use — deploy.sh will use port 5433 for Docker Postgres"
+    else
+        ok "Port 5432 is free  (Postgres Docker will use this)"
+    fi
 else
-    warn "ss not available — can't check port 8000"
+    warn "ss not available — can't check ports"
 fi
 echo ""
 
