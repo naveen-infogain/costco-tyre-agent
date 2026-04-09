@@ -1,0 +1,40 @@
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: tireassist-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: costco_tyre
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d costco_tyre"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: tireassist-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: costco_tyre
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    ports:
+      - "${APP_PORT:-8001}:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 1
+
+volumes:
+  pgdata:
