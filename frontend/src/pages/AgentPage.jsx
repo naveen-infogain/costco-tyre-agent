@@ -91,6 +91,7 @@ export default function AgentPage({ member, onSwitchToStore, onSwitchToAgent, on
             isTtsPlaying={isTtsPlaying}
             interimText={interimText}
             onToggleMic={toggleMic}
+            onFocus={() => setUserInteracted(true)}
           />
 
         </div>

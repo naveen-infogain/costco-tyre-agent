@@ -146,7 +146,9 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 # In dev mode (npm run dev on :5173) this folder may not exist — that's fine.
 _REACT_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 if _REACT_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=str(_REACT_DIST / "assets")), name="react-assets")
+    # /assets — JS/CSS bundles
+    if (_REACT_DIST / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(_REACT_DIST / "assets")), name="react-assets")
 
 # ---------------------------------------------------------------------------
 # Lazy LLM — single shared ChatAnthropic instance
@@ -3141,6 +3143,20 @@ async def serve_favicon():
     favicon = _REACT_DIST / "favicon.svg"
     if favicon.exists():
         return FileResponse(str(favicon), media_type="image/svg+xml")
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+@app.get("/tyre_assist.svg", include_in_schema=False)
+async def serve_tyre_assist_svg():
+    f = _REACT_DIST / "tyre_assist.svg"
+    if f.exists():
+        return FileResponse(str(f), media_type="image/svg+xml")
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+@app.get("/bg-tyres.jpg", include_in_schema=False)
+async def serve_bg_tyres():
+    f = _REACT_DIST / "bg-tyres.jpg"
+    if f.exists():
+        return FileResponse(str(f), media_type="image/jpeg")
     return JSONResponse({"error": "not found"}, status_code=404)
 
 @app.get("/demo-members")
