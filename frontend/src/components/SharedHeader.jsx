@@ -35,7 +35,7 @@ export default function SharedHeader({ activePage, member, onSwitchToAgent, onSw
           onClick={onSwitchToAgent}
         >
           <span className="material-symbols-rounded" style={{ fontSize: 15 }}>smart_toy</span>
-          Agentic Agent
+          TireAssist
         </button>
         <button
           className={`sh-toggle-btn${activePage === 'store' ? ' sh-toggle-active' : ''}`}

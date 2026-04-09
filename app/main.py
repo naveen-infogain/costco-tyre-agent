@@ -67,6 +67,64 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Arize observability — traces every LLM call + LangChain tool invocation
+# Optional: app runs normally without it if keys are absent.
+# ---------------------------------------------------------------------------
+
+def _setup_arize() -> bool:
+    """
+    Initialise Arize OpenTelemetry tracing for LangChain.
+
+    Reads ARIZE_SPACE_ID and ARIZE_API_KEY from environment.
+    Returns True if tracing was set up, False if keys are missing.
+
+    What gets traced automatically:
+      - Every ChatAnthropic LLM call (input tokens, output tokens, latency, model)
+      - Every @tool invocation (generate_personalised_msg, generate_punch_line, etc.)
+      - Every LangChain agent run (if ReAct agents are activated)
+
+    Custom spans added manually:
+      - /chat pipeline span (intent, stage, session_id, member_id)
+      - /image-analyse span (scenario, car_make, tyre_size)
+    """
+    space_id = os.environ.get("ARIZE_SPACE_ID")
+    api_key  = os.environ.get("ARIZE_API_KEY")
+
+    if not space_id or not api_key:
+        logger.info("Arize: ARIZE_SPACE_ID or ARIZE_API_KEY not set — tracing disabled")
+        return False
+
+    try:
+        from arize.otel import register
+        from openinference.instrumentation.langchain import LangChainInstrumentor
+
+        # Register sends traces to Arize cloud via OTLP/gRPC
+        register(
+            space_id=space_id,
+            api_key=api_key,
+            project_name=os.environ.get("ARIZE_PROJECT_NAME", "costco-tyre-agent"),
+        )
+
+        # Auto-instrument all LangChain / LangGraph calls
+        LangChainInstrumentor().instrument()
+
+        logger.info("Arize: tracing enabled → project=%s", os.environ.get("ARIZE_PROJECT_NAME", "costco-tyre-agent"))
+        return True
+
+    except ImportError:
+        logger.warning(
+            "Arize: packages not installed — run: "
+            "pip install arize-otel openinference-instrumentation-langchain"
+        )
+        return False
+    except Exception as exc:
+        logger.warning("Arize: setup failed (%s) — tracing disabled", exc)
+        return False
+
+
+_ARIZE_ENABLED = _setup_arize()
+
+# ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 
@@ -654,6 +712,57 @@ _PRICE_INTENT_CONFIG: dict[str, dict] = {
     },
 }
 
+def _extract_price_limit(msg: str) -> Optional[float]:
+    """
+    Extract an explicit price ceiling from the message in any language.
+
+    Handles patterns like:
+      English:  "less than $130", "under 150", "below $200", "max $120", "no more than 140"
+      Hindi:    "130 se kam", "130 rupaye se kam", "150 se neeche", "zyada se zyada 130"
+      Telugu:   "130 kante takkuva", "130 lopala"
+      Numbers:  bare "$130", "130 dollars" when combined with a qualifier word
+
+    Returns the float price limit or None if no price constraint found.
+    """
+    m = msg.lower()
+
+    # Pattern: qualifier word + optional $ + number (e.g. "under $130", "less than 150")
+    _UNDER_RE = re.compile(
+        r"(?:"
+        r"under|below|less\s+than|cheaper\s+than|no\s+more\s+than|max(?:imum)?|"
+        r"within|up\s+to|at\s+most|not\s+more\s+than|"
+        # Hindi
+        r"se\s+kam|se\s+neeche|se\s+sasta|zyada\s+se\s+zyada|itne\s+mein|"
+        r"itna\s+budget|budget\s+hai|ke\s+andar|ke\s+neeche|tak\s+ke|"
+        # Telugu
+        r"kante\s+takkuva|lopala|kante\s+takkuva\s+ga"
+        r")"
+        r"\s*[\$₹£€]?\s*(\d{2,5}(?:[.,]\d{1,2})?)",
+        re.IGNORECASE,
+    )
+
+    # Pattern: number + qualifier (e.g. "130 se kam", "$130 budget", "130 max")
+    _NUM_FIRST_RE = re.compile(
+        r"[\$₹£€]?\s*(\d{2,5}(?:[.,]\d{1,2})?)\s*"
+        r"(?:se\s+kam|se\s+neeche|se\s+sasta|max|maximum|or\s+less|and\s+below|budget|tak|"
+        r"kante\s+takkuva|lopala)",
+        re.IGNORECASE,
+    )
+
+    # Pattern: "more cheaper", "more affordable" — these imply budget intent but no number
+    # (handled by _detect_price_intent returning "budget", not here)
+
+    for pattern in (_UNDER_RE, _NUM_FIRST_RE):
+        match = pattern.search(m)
+        if match:
+            raw = match.group(1).replace(",", ".")
+            try:
+                return float(raw)
+            except ValueError:
+                pass
+    return None
+
+
 def _detect_price_intent(msg: str) -> str:
     """
     Detect what kind of tyre the user is looking for from their message.
@@ -663,12 +772,19 @@ def _detect_price_intent(msg: str) -> str:
     """
     m = msg.lower()
 
-    # Budget / cheap signals — English + Hindi + Telugu
+    # Budget / cheap signals — English + Hindi + Telugu + "more cheaper" patterns
     if re.search(
         r"\bcheap\b|\bbudget\b|\baffordabl\b|\beconom\b|\blow.?price\b|\binexpensiv\b|"
-        r"\bsaasta\b|\bsasti\b|\bsasta\b|\bkam\s+price\b|\bkam\s+daam\b|\bvalue\b.*\bmoney\b|"
-        r"\bsastaa\b|\bchota\b.*\bprice\b|\bless\s+expen\b|\bdon.t\s+want\s+to\s+spend\b|"
-        r"\btight\s+budget\b|\bon\s+a\s+budget\b|\bwithout\s+breaking\b",
+        r"\bmore\s+cheap\b|\bmore\s+affordabl\b|\bcheaper\b|\bsomething\s+cheaper\b|"
+        r"\bless\s+expensiv\b|\bless\s+pric\b|\bcost\s+less\b|"
+        r"\bsaasta\b|\bsasti\b|\bsasta\b|\bkam\s+price\b|\bkam\s+daam\b|"
+        r"\bsastaa\b|\bless\s+expen\b|\bdon.t\s+want\s+to\s+spend\b|"
+        r"\btight\s+budget\b|\bon\s+a\s+budget\b|\bwithout\s+breaking\b|"
+        # Hindi cheap/price
+        r"\bsasta\b|\bsaste\b|\bsasti\b|\bkam\s+keemat\b|\bsastay\b|\bkam\s+paise\b|"
+        r"\bkam\s+mein\b|\bthoda\s+kam\b|\bkam\s+ka\b|"
+        # Telugu
+        r"\btakkuva\s+dharam\b|\btakkuva\b.*\bdharamb|\bcheepa\b|\bless\s+cost\b",
         m,
     ):
         return "budget"
@@ -1098,6 +1214,8 @@ def _build_recommendation_cards(session: SessionState, user) -> list[dict]:
     season = _detect_season(city)
     # terrain: explicit override from message > driving_habits inference
     terrain = session.preferences.get("override_terrain") or _infer_terrain(user.driving_habits)
+    # max_price: explicit price ceiling from user message ("less than $130", "130 se kam")
+    max_price: Optional[float] = session.preferences.get("max_price")
 
     cards = []
 
@@ -1107,15 +1225,18 @@ def _build_recommendation_cards(session: SessionState, user) -> list[dict]:
         size = last_tyre.size if last_tyre else _infer_size(user.vehicle)
 
         # Search with auto-detected season; broaden progressively until we have 3+ options
-        results = search_tyres(size=size, season=season, terrain=terrain, in_stock_only=True)
+        results = search_tyres(size=size, season=season, terrain=terrain, max_price=max_price, in_stock_only=True)
         if len(results) < 3:
-            _extra = search_tyres(size=size, season="all-season", terrain=terrain, in_stock_only=True)
+            _extra = search_tyres(size=size, season="all-season", terrain=terrain, max_price=max_price, in_stock_only=True)
             _seen = {t.id for t in results}
             results += [t for t in _extra if t.id not in _seen]
         if len(results) < 3:
-            _extra = search_tyres(size=size, in_stock_only=True)
+            _extra = search_tyres(size=size, max_price=max_price, in_stock_only=True)
             _seen = {t.id for t in results}
             results += [t for t in _extra if t.id not in _seen]
+        # If price filter yields nothing, relax it so we don't show empty results
+        if not results and max_price:
+            results = search_tyres(size=size, season=season, terrain=terrain, in_stock_only=True)
 
         # Slot 1: Best Repurchase (same tyre if in stock)
         repurchase = last_tyre if (last_tyre and last_tyre.stock.qty > 0) else None
@@ -1155,15 +1276,19 @@ def _build_recommendation_cards(session: SessionState, user) -> list[dict]:
         size = session.preferences.get("override_tyre_size") or _infer_size(user.vehicle)
 
         # Search with auto-detected season + inferred terrain; broaden progressively until we have 3+
-        results = search_tyres(size=size, season=season, terrain=terrain, in_stock_only=True)
+        results = search_tyres(size=size, season=season, terrain=terrain, max_price=max_price, in_stock_only=True)
         if len(results) < 3:
-            _extra = search_tyres(size=size, season="all-season", terrain=terrain, in_stock_only=True)
+            _extra = search_tyres(size=size, season="all-season", terrain=terrain, max_price=max_price, in_stock_only=True)
             _seen = {t.id for t in results}
             results += [t for t in _extra if t.id not in _seen]
         if len(results) < 3:
-            _extra = search_tyres(size=size, in_stock_only=True)
+            _extra = search_tyres(size=size, max_price=max_price, in_stock_only=True)
             _seen = {t.id for t in results}
             results += [t for t in _extra if t.id not in _seen]
+        # If price filter yields nothing, relax it (show what we have, warn in response)
+        if not results and max_price:
+            results = search_tyres(size=size, season=season, terrain=terrain, in_stock_only=True)
+            session.preferences["price_filter_relaxed"] = True
         if not results:
             results = search_tyres(in_stock_only=True)
 
@@ -1659,6 +1784,24 @@ async def chat(req: ChatRequest):
 
     intent = _detect_intent(msg, session)
 
+    # ── Arize: annotate span with pipeline metadata ───────────────────────
+    # LangChainInstrumentor auto-creates spans for LLM calls.
+    # We enrich the parent /chat span with business-level attributes so Arize
+    # dashboards can filter by intent, stage, member, language, and ranking intent.
+    if _ARIZE_ENABLED:
+        try:
+            from opentelemetry import trace as _otel_trace
+            _span = _otel_trace.get_current_span()
+            _span.set_attribute("chat.session_id",      req.session_id)
+            _span.set_attribute("chat.member_id",       session.member_id or "")
+            _span.set_attribute("chat.stage",           session.stage or "")
+            _span.set_attribute("chat.intent",          intent)
+            _span.set_attribute("chat.user_path",       session.user_path or "")
+            _span.set_attribute("chat.language",        session.preferences.get("language", "English"))
+            _span.set_attribute("chat.ranking_intent",  session.preferences.get("ranking_intent", "none"))
+        except Exception:
+            pass  # Never let tracing break the request
+
     # Detect and persist language — updates on every message so it adapts.
     # Priority: once a non-English language is detected it sticks for the session.
     detected_lang = _detect_language(msg)
@@ -1679,6 +1822,18 @@ async def chat(req: ChatRequest):
     detected_intent = _detect_price_intent(msg)
     if detected_intent != "none":
         session.preferences["ranking_intent"] = detected_intent
+        # A specific price intent without an explicit number clears any stale price cap
+        # so we don't accidentally filter too aggressively.
+        if detected_intent != "budget":
+            session.preferences.pop("max_price", None)
+
+    # Extract explicit price ceiling (e.g. "less than $130", "130 se kam")
+    # Persists across messages; cleared when user expresses a non-budget intent.
+    price_limit = _extract_price_limit(msg)
+    if price_limit is not None:
+        session.preferences["max_price"] = price_limit
+        # A price cap always implies budget intent
+        session.preferences["ranking_intent"] = "budget"
 
     cards = []
     comparison = None
@@ -1727,16 +1882,24 @@ async def chat(req: ChatRequest):
 
         use_case = session.preferences.get("use_case", "")
         ranking_intent = session.preferences.get("ranking_intent", "none")
+        max_price_val = session.preferences.get("max_price")
+        price_relaxed = session.preferences.pop("price_filter_relaxed", False)
         _intent_labels = {
             "budget": "cheapest options", "premium": "top-quality options",
             "performance": "best-performing options", "safety": "safest options",
             "longevity": "longest-lasting options", "value": "best value-for-money options",
         }
-        intent_note = (
-            f"The member asked for {_intent_labels[ranking_intent]} — acknowledge that in one word (e.g. 'Sorted by budget!' / 'Here are the safest picks!')."
-            if ranking_intent != "none" else
-            ("Include their previous tyre choice plus two alternatives." if session.user_path == "A" else "Show top pick, runner-up, and a budget option.")
-        )
+        if price_relaxed and max_price_val:
+            intent_note = (
+                f"The member wanted tyres under ${max_price_val:.0f} but none were available. "
+                f"Say sorry we couldn't find any under ${max_price_val:.0f}, here are the closest options."
+            )
+        elif max_price_val:
+            intent_note = f"The member set a price limit of ${max_price_val:.0f} — mention that all shown options are within their budget."
+        elif ranking_intent != "none":
+            intent_note = f"The member asked for {_intent_labels.get(ranking_intent, ranking_intent)} — acknowledge that briefly (e.g. 'Sorted by budget!' / 'Here are the safest picks!')."
+        else:
+            intent_note = "Include their previous tyre choice plus two alternatives." if session.user_path == "A" else "Show top pick, runner-up, and a budget option."
         system = (
             f"{_PERSONA} "
             f"You've just pulled up tyre recommendations for the member. "
@@ -2063,17 +2226,22 @@ async def chat(req: ChatRequest):
                     session.preferences.get("override_terrain")
                     or (_infer_terrain(user.driving_habits) if user else "highway")
                 )
-                results = svc_search(size=tyre_size, season=season, terrain=terrain, in_stock_only=True)
+                _max_price_nv = session.preferences.get("max_price")
+                results = svc_search(size=tyre_size, season=season, terrain=terrain, max_price=_max_price_nv, in_stock_only=True)
                 if len(results) < 3:
                     # Broaden: relax season constraint, keep terrain
-                    _extra = svc_search(size=tyre_size, terrain=terrain, in_stock_only=True)
+                    _extra = svc_search(size=tyre_size, terrain=terrain, max_price=_max_price_nv, in_stock_only=True)
                     _seen = {t.id for t in results}
                     results += [t for t in _extra if t.id not in _seen]
                 if len(results) < 3:
                     # Broaden further: drop both season and terrain — size match only
-                    _extra = svc_search(size=tyre_size, in_stock_only=True)
+                    _extra = svc_search(size=tyre_size, max_price=_max_price_nv, in_stock_only=True)
                     _seen = {t.id for t in results}
                     results += [t for t in _extra if t.id not in _seen]
+                # If price filter leaves nothing, relax it gracefully
+                if not results and _max_price_nv:
+                    results = svc_search(size=tyre_size, season=season, terrain=terrain, in_stock_only=True)
+                    session.preferences["price_filter_relaxed"] = True
 
                 if not results:
                     from app.services.stock_service import get_available_sizes
@@ -2153,16 +2321,21 @@ async def chat(req: ChatRequest):
                 car_label = session.preferences.get("car_label", "")
                 use_case = session.preferences.get("use_case", "")
                 _ranking_intent = session.preferences.get("ranking_intent", "none")
+                _max_price_val  = session.preferences.get("max_price")
+                _price_relaxed  = session.preferences.pop("price_filter_relaxed", False)
                 _intent_labels = {
                     "budget": "cheapest options", "premium": "top-quality options",
                     "performance": "best-performing options", "safety": "safest options",
                     "longevity": "longest-lasting options", "value": "best value-for-money options",
                 }
-                _intent_note = (
-                    f"Member asked for {_intent_labels[_ranking_intent]} — say that's sorted in your reply."
-                    if _ranking_intent != "none" else
-                    "Mention different price points and brands."
-                )
+                if _price_relaxed and _max_price_val:
+                    _intent_note = f"No tyres found under ${_max_price_val:.0f} — say sorry, here are the closest options available."
+                elif _max_price_val:
+                    _intent_note = f"Member set a price limit of ${_max_price_val:.0f} — confirm all shown options are within budget."
+                elif _ranking_intent != "none":
+                    _intent_note = f"Member asked for {_intent_labels.get(_ranking_intent, _ranking_intent)} — acknowledge briefly."
+                else:
+                    _intent_note = "Mention different price points and brands."
                 _card_system = (
                     f"{_PERSONA} {_lang_instr} "
                     f"You've just pulled up tyre recommendations. "
@@ -2402,6 +2575,25 @@ async def chat(req: ChatRequest):
                     "bring":       ["Vehicle registration", "Costco membership card"],
                     "calendar":    True,
                 }
+
+                # WhatsApp booking confirmation via Twilio — non-fatal if not configured
+                try:
+                    from app.services.whatsapp_service import send_booking_confirmation
+                    _wa_result = send_booking_confirmation(
+                        member_name=user.name,
+                        booking_id=booking["booking_id"],
+                        order_id=session.order_id,
+                        date=readable_date,
+                        time=time_str,
+                        location=_short_loc,
+                        address=loc.get("address", ""),
+                        tyre=f"{tyre.brand} {tyre.model} x4" if tyre else "Tyres x4",
+                    )
+                    if _wa_result["sent"]:
+                        logger.info("WhatsApp confirmation sent — SID: %s", _wa_result["sid"])
+                except Exception as _e:
+                    logger.warning(f"WhatsApp notification error (non-fatal): {_e}")
+
                 first = user.name.split()[0]
                 _book_system = (
                     f"{_PERSONA} Booking is confirmed. "
@@ -2530,6 +2722,18 @@ async def chat(req: ChatRequest):
         safe_response = response_text
 
     add_to_history(req.session_id, "assistant", safe_response)
+
+    # ── Arize: record outcome attributes on span ──────────────────────────
+    if _ARIZE_ENABLED:
+        try:
+            from opentelemetry import trace as _otel_trace
+            _span = _otel_trace.get_current_span()
+            _span.set_attribute("chat.response_stage",    session.stage or "")
+            _span.set_attribute("chat.cards_returned",    len(cards))
+            _span.set_attribute("chat.has_booking",       booking_card is not None)
+            _span.set_attribute("chat.guardrail_applied", safe_response != response_text)
+        except Exception:
+            pass
 
     return {
         "message": safe_response,
