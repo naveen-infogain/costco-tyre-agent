@@ -50,6 +50,17 @@ DB_PORT=5432
 DB_NAME=costco_tyres
 DB_USER=postgres
 DB_PASSWORD=...
+
+# Arize observability (optional — tracing disabled if not set)
+ARIZE_SPACE_ID=...
+ARIZE_API_KEY=...
+ARIZE_PROJECT_NAME=costco-tyre-agent
+
+# Twilio WhatsApp (optional — booking WA message disabled if not set)
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxx
+TWILIO_FROM_WHATSAPP=whatsapp:+14155238886   # Twilio sandbox number
+TWILIO_TO_WHATSAPP=whatsapp:+91XXXXXXXXXX    # demo recipient number
 ```
 
 ---
@@ -344,6 +355,65 @@ Single file, organised by section with ASCII dividers:
 - Fixed all 3 `locations.json` reads in `main.py` with `encoding='utf-8'`
 - `stock_service.py` regex uses `[-\u2013\u2014]` Unicode escapes instead of raw em-dash characters
 
+### ✅ Multilingual Vehicle Detection
+- Tier 1.5 block in `_detect_intent()` — brand/model regex fires BEFORE stage rules and destination context
+- `_MODEL_NAMES_RE` — compiled regex of 400+ car model names (sorted longest-first, prevents partial matches)
+- `_KNOWN_MODEL_MAKES` — 50+ model → brand reverse lookup (nexon→Tata, creta→Hyundai, swift→Maruti Suzuki, etc.)
+- `_MULTILANG_FILLERS` regex strips Telugu/Hindi filler words from extracted model name (`kosam`, `lo`, `se`, `mein`, `lekar`, etc.)
+- Hindi `_LANG_MARKERS` expanded: jata, hun, lekar, wala, etc.
+- `_MORPH_PATTERNS` expanded with "jata hun", "lekar" patterns
+- `_LANG_INSTRUCTION` dict per language — appended to system prompt so LLM replies in same language as user
+- Languages: English, Hindi, Telugu, Hinglish, Tamil, Kannada, Marathi, Bengali
+
+### ✅ Price & Quality Intent Detection
+- `_detect_price_intent(msg)` — returns `budget | premium | performance | safety | longevity | value | none`
+- `_extract_price_limit(msg)` — extracts exact cap from "less than $130", "130 se kam", "130 kante takkuva" (multilingual)
+- `_PRICE_INTENT_CONFIG` — per-intent sort lambdas + slot labels
+- `session.preferences["max_price"]` stored and passed to all `search_tyres()` calls
+- Graceful fallback: if `max_price` yields 0 results, sets `price_filter_relaxed` flag and shows closest options with a note
+
+### ✅ Image Upload — Car Detection Flow
+- `image_service.py` Vision prompt: Scenario C returns `car_identified` (make/model found) vs `car` (not found)
+- `car_identified` response includes: `car_make`, `car_model`, `car_confidence`, `health_score`, `recommendation`
+- `/image-analyse` handler: `car_identified` → `_infer_size_from_text(car_text)` → search → 3 tyre cards
+- If size not in map → asks user to confirm, sets `partial_make`, stage=`collect_vehicle`
+- If health worn → adds note to intro; if no stock → honest message with available sizes
+
+### ✅ Arize Observability
+- `_setup_arize()` in `main.py` — initialises OTel tracing to Arize platform on startup
+- `LangChainInstrumentor` auto-traces all LLM calls (tokens, latency, model)
+- Custom span attributes on every `/chat` request: `intent`, `stage`, `language`, `ranking_intent`, `cards_returned`, `guardrail_applied`
+- Env vars: `ARIZE_SPACE_ID`, `ARIZE_API_KEY`, `ARIZE_PROJECT_NAME`
+- Graceful: `try/except ImportError` — app runs normally without Arize packages installed
+- Install: `pip install arize-otel openinference-instrumentation-langchain opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc`
+
+### ✅ WhatsApp Booking Confirmation (Twilio)
+- New service: `app/services/whatsapp_service.py`
+- Fires after `booking_card` is built in the `book_slot` handler in `main.py`
+- Sends formatted WhatsApp message: booking ID, order ID, date/time, location, tyre, bring-list
+- Non-fatal: missing credentials → logs warning, booking flow continues unaffected
+- Env vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_WHATSAPP`, `TWILIO_TO_WHATSAPP`
+- For demo: `TWILIO_TO_WHATSAPP` is a fixed number (your own); swap for `user.phone_number` when phone added to member profiles
+- Install: `pip install twilio`
+- Twilio sandbox setup: send `join <keyword>` to `+14155238886` on WhatsApp once to activate
+
+### ✅ CSS Fix — TTS Wave Bar Width
+- `.tts-wave-bar` changed to `position: absolute; bottom: 4px; left: 0; right: 0; pointer-events: none`
+- `.ta-input-bar` gets `position: relative; width: 100%; box-sizing: border-box`
+- Prevents flex reflow that was shrinking the input bar width when TTS animation appeared
+
+### ✅ Header Agent Name
+- Toggle pill in `SharedHeader.jsx` updated from "Agentic Agent" → "TireAssist"
+- Page title in `AgentPage.jsx` remains "Meet TireAssist, Your AI Executive Assistant"
+
+### ✅ Favicon
+- `frontend/public/favicon.svg` added
+- `frontend/index.html` wired: `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`
+
+### ✅ Documentation
+- `ARCHITECTURE.md` — full technical deep dive (pipeline, intent tiers, car mapping, search, language detection, image flow, agents, services, LangChain, 3rd party APIs, models, key decisions)
+- `PRESENTATION.md` — jury-ready technical presentation (16 sections, talk-track format)
+
 ---
 
 ## Pending Tasks for Next Developer
@@ -358,39 +428,46 @@ Single file, organised by section with ASCII dividers:
 - `_humanise_for_tts()` in `voice_service.py`: strips markdown/codes, converts lists to natural sentences, expands abbreviations, converts prices to spoken form ("169 dollars and 99 cents"), removes emojis and tyre ID codes
 - Content safety gate in `voice_service.py`: `_BLOCKED_PATTERNS` regex blocks inappropriate language before it reaches ElevenLabs API
 
-#### 6a — Auto-TTS (read bot responses aloud automatically)
-- Currently TTS is manual — user must click the speaker button after each bot response
-- **TODO:** Add a toggle in the UI ("Auto-read responses") that, when on, calls `speakLastResponse()` automatically after every bot message
-- Suggested: small toggle chip near the input bar; persist preference in `localStorage`
-- Hook location: `useVoice.js` — watch `lastBotText` in a `useEffect`, call `speakLastResponse()` if auto-mode is on and TTS is not already playing
+#### 6a — Auto-TTS toggle
+- **TODO:** Add a "Auto-read responses" toggle chip near the input bar; persist in `localStorage`
+- Hook location: `useVoice.js` — watch `lastBotText` in a `useEffect`, call `speakLastResponse()` if auto-mode on and TTS not already playing
 
-#### 6b — Voice-Driven Full Conversation Mode
-- **TODO:** After STT sends a message and bot replies, automatically re-activate the mic so the user never has to touch the screen
-- Flow: user speaks → `onTranscript` → bot responds → TTS plays → on TTS `audio.onended` → re-activate mic (if "hands-free mode" toggle is on)
-- Guard: do NOT re-activate mic if user manually stopped listening or if the session stage is `complete`
-- Hook location: `useVoice.js` — in `audio.onended` callback, check `handsFreeModeRef` and call `toggleMic()`
+#### 6b — Hands-free mode
+- **TODO:** After STT sends + TTS ends, auto-reactivate mic
+- Flow: speak → send → TTS plays → `audio.onended` → re-activate mic if `handsFreeModeRef` on
+- Guard: skip if user manually stopped, or stage is `complete`
+- Hook location: `useVoice.js` `audio.onended` callback
 
-#### 6c — Voice Persona Selection
-- ElevenLabs supports multiple voices; `ELEVENLABS_VOICE_ID` is currently a single env var
-- **TODO:** Expose a voice selector in the UI (3–4 preset voices: e.g. Rachel, Josh, Elli, Antoni)
-- Backend: `GET /voice/voices` endpoint returns available voice options (id + name)
-- Frontend: small selector (icon chips or a dropdown) in `AgentPage` or `ChatInput`
-- When user picks a voice, store in `localStorage` and send `voice_id` as param in the `/voice/tts` POST body
-- Backend: `voice/tts` endpoint reads `voice_id` from request body (falls back to `ELEVENLABS_VOICE_ID` env var)
+#### 6c — Voice persona selector
+- **TODO:** `GET /voice/voices` endpoint + small UI selector (3–4 presets: Rachel, Josh, Elli, Antoni)
+- Store chosen `voice_id` in `localStorage`; send as param in `/voice/tts` POST body
+- Backend: `voice_service.py` reads `voice_id` from body, falls back to `ELEVENLABS_VOICE_ID` env var
 
-#### 6d — STT Error Recovery & Feedback
-- Current: mic errors are silently swallowed (`console.warn` only)
-- **TODO:** On STT error (e.g. `no-speech`, `network`, `not-allowed`):
-  - `no-speech` → show a brief toast "Didn't catch that — tap mic to try again"
-  - `not-allowed` → show persistent banner "Microphone access denied — enable in browser settings"
-  - `network` → fall back gracefully, show "Voice unavailable — type your message"
-- Suggested: add a `sttError` state in `useVoice.js`, render a small error chip above the input bar in `ChatInput`
+#### 6d — STT error feedback
+- **TODO:** On `no-speech` → toast; `not-allowed` → persistent banner; `network` → graceful fallback
+- Add `sttError` state in `useVoice.js`; render error chip above input bar in `ChatInput.jsx`
 
-#### 6e — TTS Playback Controls
-- Current: speaker button toggles play/stop; no progress indication
-- **TODO:** Show a waveform animation or progress bar while TTS is playing (`.isTtsPlaying` is already exposed)
-- Suggested: animated dots or a thin progress bar at the bottom of the bot bubble that's being read
-- Optional: speed control (0.75×, 1×, 1.25×) — ElevenLabs supports `speaking_rate` in the payload
+#### 6e — TTS playback controls
+- **TODO:** Waveform animation on bot bubble being read; optional speed control (0.75×/1×/1.25×)
+- ElevenLabs supports `speaking_rate` in the POST body
+
+### Task 7 — WhatsApp: Per-Member Phone Numbers
+- Currently `TWILIO_TO_WHATSAPP` is a single fixed number (demo mode)
+- **TODO:** Add `phone_number` field to `users.json` and `User` Pydantic model (`schemas.py`)
+- **TODO:** Update `whatsapp_service.py` to accept `to_number` param; caller passes `user.phone_number`
+- **TODO:** Update `main.py` `book_slot` handler: pass `user.phone_number` (formatted as `whatsapp:+{number}`) to `send_booking_confirmation()`
+
+### Task 8 — Details Button
+- Tyre card "Details" button click is intentionally disabled / deferred
+- **TODO:** Wire up a detail view — either an expanded card or a modal — showing full specs (tread life, wet grip, noise dB, compatible vehicles, warranty, reviews)
+- Suggested: expand the existing `BotBubble` detail flow triggered by "I'd like to view details for..." OR build a `DetailModal` component
+
+### Task 9 — Production Hardening
+- Session state is in-memory (`SESSION_STORE` dict) — resets on server restart
+- **TODO:** Swap for Redis or PostgreSQL-backed session store for multi-worker deployments
+- `CART_RESERVE_MINUTES=15` TTL is in-memory only — needs a background task to expire carts
+- Payment flow is mocked (`payment_service.py`) — needs real payment gateway integration
+- `users.json` / `tyres.json` → swap for live DB queries when moving to production
 
 ---
 

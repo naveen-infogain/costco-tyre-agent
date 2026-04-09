@@ -142,6 +142,12 @@ _STATIC_DIR = Path(__file__).parent / "static"
 _STATIC_DIR.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
+# React build output — served when `npm run build` has been run.
+# In dev mode (npm run dev on :5173) this folder may not exist — that's fine.
+_REACT_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+if _REACT_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_REACT_DIST / "assets")), name="react-assets")
+
 # ---------------------------------------------------------------------------
 # Lazy LLM — single shared ChatAnthropic instance
 # ---------------------------------------------------------------------------
@@ -3123,8 +3129,19 @@ async def voice_tts(req: TTSRequest):
 
 @app.get("/", include_in_schema=False)
 async def serve_ui():
-    index = _STATIC_DIR / "index.html"
-    return FileResponse(str(index)) if index.exists() else JSONResponse({"error": "UI not built"}, status_code=503)
+    # Prefer React build (frontend/dist) over legacy static UI
+    react_index = _REACT_DIST / "index.html"
+    if react_index.exists():
+        return FileResponse(str(react_index))
+    legacy_index = _STATIC_DIR / "index.html"
+    return FileResponse(str(legacy_index)) if legacy_index.exists() else JSONResponse({"error": "UI not built"}, status_code=503)
+
+@app.get("/favicon.svg", include_in_schema=False)
+async def serve_favicon():
+    favicon = _REACT_DIST / "favicon.svg"
+    if favicon.exists():
+        return FileResponse(str(favicon), media_type="image/svg+xml")
+    return JSONResponse({"error": "not found"}, status_code=404)
 
 @app.get("/demo-members")
 async def demo_members():

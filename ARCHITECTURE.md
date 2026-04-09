@@ -784,6 +784,59 @@ The agent definitions in `agents/` are the intended production architecture for 
 
 ---
 
+### 6. Twilio WhatsApp API
+
+| Property | Value |
+|----------|-------|
+| Used for | Booking confirmation message sent via WhatsApp |
+| Auth | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` in `.env` |
+| From | `TWILIO_FROM_WHATSAPP` — sandbox: `whatsapp:+14155238886` |
+| To | `TWILIO_TO_WHATSAPP` — demo: fixed number; production: `user.phone_number` |
+| Endpoint | `POST https://api.twilio.com/2010-04-01/Accounts/{SID}/Messages.json` |
+| Latency | ~500ms–1s |
+| Cost | Sandbox free; production ~$0.005/message |
+| Integration | `app/services/whatsapp_service.py → send_booking_confirmation()` |
+| Fallback | Non-fatal — missing credentials logs warning, booking succeeds normally |
+
+**Sandbox setup (one-time):** Send `join <keyword>` to `+14155238886` on WhatsApp to enable the sandbox for your number.
+
+**When to move to production:**
+1. Add `phone_number` field to `users.json` + `User` Pydantic schema
+2. Pass `user.phone_number` to `send_booking_confirmation()` as `to_number` param
+3. Replace sandbox `TWILIO_FROM_WHATSAPP` with your approved WhatsApp Business number
+
+---
+
+### 7. Arize Phoenix (Observability / LLM Tracing)
+
+| Property | Value |
+|----------|-------|
+| Used for | LLM call tracing, token counts, latency, intent/stage analytics |
+| Auth | `ARIZE_SPACE_ID`, `ARIZE_API_KEY` in `.env` |
+| Endpoint | OTLP gRPC → `otlp.arize.com:443` |
+| Project | `ARIZE_PROJECT_NAME=costco-tyre-agent` |
+| Integration | `arize-otel` + `openinference-instrumentation-langchain` |
+| Fallback | `try/except ImportError` — app runs without packages installed |
+
+**What is traced automatically (via `LangChainInstrumentor`):**
+- Every `ChatAnthropic.invoke()` call: model, input tokens, output tokens, latency
+- LangChain chain tracing (parent/child spans)
+
+**Custom span attributes added on every `/chat` request:**
+```python
+chat.intent          # e.g. "new_vehicle_detail"
+chat.stage           # e.g. "browse"
+chat.language        # e.g. "Hindi"
+chat.ranking_intent  # e.g. "budget"
+chat.cards_returned  # e.g. 3
+chat.guardrail       # True/False
+chat.has_booking     # True/False
+```
+
+**Install:** `pip install arize-otel openinference-instrumentation-langchain opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc`
+
+---
+
 ## Which Model for What
 
 | Task | Model | Notes |
@@ -873,6 +926,9 @@ The agent definitions in `agents/` are the intended production architecture for 
 | **Agents defined but not active** | Architecture ready to switch to full ReAct loop per agent; deterministic pipeline cheaper for MVP |
 | **ElevenLabs optional** | Voice gracefully degrades; app fully functional without it |
 | **Browser STT (Web Speech API)** | Zero cost; no server-side audio processing; only Chrome/Edge |
+| **Twilio WhatsApp non-fatal** | Booking never blocked by notification failure; easy to enable/disable via env vars |
+| **Arize via try/except ImportError** | Observability is opt-in; app works on machines where packages aren't installed |
+| **Price intent qualitative + quantitative** | "cheap" changes sort order; "$130 se kam" filters by cap — both handled without LLM |
 
 ---
 
