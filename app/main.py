@@ -603,6 +603,121 @@ def _detect_terrain_from_msg(msg: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
+# Price / quality intent detection
+# ---------------------------------------------------------------------------
+
+# Intent → (sort_key, slot_labels, slot_types)
+# sort_key: lambda applied to tyre objects before picking top 3
+_PRICE_INTENT_CONFIG: dict[str, dict] = {
+    "budget": {
+        "sort": lambda t: t.member_price,          # cheapest first
+        "reverse": False,
+        "labels": ["Best Value", "Budget Pick", "Most Affordable"],
+        "types":  ["budget_alt", "budget_alt", "budget_alt"],
+        "punch_slot": 0,
+    },
+    "premium": {
+        "sort": lambda t: (-t.rating, t.member_price),  # highest rating first, then price desc
+        "reverse": False,
+        "labels": ["Premium Pick", "Top Performer", "Runner-up"],
+        "types":  ["top_pick", "runner_up", "budget_alt"],
+        "punch_slot": 0,
+    },
+    "performance": {
+        "sort": lambda t: (-t.rating, t.noise_db),   # highest rating, lowest noise
+        "reverse": False,
+        "labels": ["Best Performance", "High Grip", "Runner-up"],
+        "types":  ["top_pick", "runner_up", "budget_alt"],
+        "punch_slot": 0,
+    },
+    "safety": {
+        "sort": lambda t: (0 if t.wet_grip == "A" else 1 if t.wet_grip == "B" else 2, -t.rating),
+        "reverse": False,
+        "labels": ["Safest Pick", "High Wet Grip", "Runner-up"],
+        "types":  ["top_pick", "runner_up", "budget_alt"],
+        "punch_slot": 0,
+    },
+    "longevity": {
+        "sort": lambda t: -t.tread_life_km,         # longest tread life first
+        "reverse": False,
+        "labels": ["Longest Lasting", "Best Durability", "Runner-up"],
+        "types":  ["top_pick", "runner_up", "budget_alt"],
+        "punch_slot": 0,
+    },
+    "value": {
+        # Best tread life per rupee/dollar spent
+        "sort": lambda t: -(t.tread_life_km / t.member_price) if t.member_price > 0 else 0,
+        "reverse": False,
+        "labels": ["Best Value for Money", "Smart Choice", "Budget Alt"],
+        "types":  ["top_pick", "runner_up", "budget_alt"],
+        "punch_slot": 0,
+    },
+}
+
+def _detect_price_intent(msg: str) -> str:
+    """
+    Detect what kind of tyre the user is looking for from their message.
+
+    Returns one of: budget | premium | performance | safety | longevity | value | none
+    'none' means no specific intent — use default rating-based ranking.
+    """
+    m = msg.lower()
+
+    # Budget / cheap signals — English + Hindi + Telugu
+    if re.search(
+        r"\bcheap\b|\bbudget\b|\baffordabl\b|\beconom\b|\blow.?price\b|\binexpensiv\b|"
+        r"\bsaasta\b|\bsasti\b|\bsasta\b|\bkam\s+price\b|\bkam\s+daam\b|\bvalue\b.*\bmoney\b|"
+        r"\bsastaa\b|\bchota\b.*\bprice\b|\bless\s+expen\b|\bdon.t\s+want\s+to\s+spend\b|"
+        r"\btight\s+budget\b|\bon\s+a\s+budget\b|\bwithout\s+breaking\b",
+        m,
+    ):
+        return "budget"
+
+    # Premium / best quality signals
+    if re.search(
+        r"\bpremium\b|\bbest\s+quality\b|\btop\s+quality\b|\bhigh.?end\b|\bluxury\b|"
+        r"\bspare\s+no\s+expense\b|\bbest\s+available\b|\bno\s+compromise\b|"
+        r"\bbehtar\b|\bsabse\s+accha\b|\bbadhiya\b|\bkamaal\b",
+        m,
+    ):
+        return "premium"
+
+    # Performance / grip / sporty signals
+    if re.search(
+        r"\bperformance\b|\bgrip\b|\bsporty\b|\bfast\b|\bhandling\b|\bcornering\b|"
+        r"\bhigh.?speed\b|\bsport\b|\btrack\b|\baggressive\b|\bresponsiv\b",
+        m,
+    ):
+        return "performance"
+
+    # Safety / wet / monsoon signals
+    if re.search(
+        r"\bsafe\b|\bsafety\b|\bwet\b|\brain\b|\bmonsoon\b|\bslippery\b|\bbraking\b|"
+        r"\bsurakh\b|\bsecure\b|\bsurakshit\b",
+        m,
+    ):
+        return "safety"
+
+    # Long lasting / durable
+    if re.search(
+        r"\blong.?last\b|\bdurabl\b|\blong\s+life\b|\btyre\s+life\b|\blong\s+mileage\b|"
+        r"\bzyada\s+chal\b|\bzyadaa\s+km\b|\bkitne\s+km\b|\btikau\b",
+        m,
+    ):
+        return "longevity"
+
+    # Value for money
+    if re.search(
+        r"\bvalue\s+for\s+money\b|\bbest\s+deal\b|\bworth\b|\bgood\s+deal\b|"
+        r"\bpaisa\s+vasool\b|\bpaisa\b.*\bvasool\b",
+        m,
+    ):
+        return "value"
+
+    return "none"
+
+
+# ---------------------------------------------------------------------------
 # Language & tone detection
 # ---------------------------------------------------------------------------
 
@@ -1052,29 +1167,49 @@ def _build_recommendation_cards(session: SessionState, user) -> list[dict]:
         if not results:
             results = search_tyres(in_stock_only=True)
 
-        # Enforce brand diversity in top 3
+        # ── Apply user intent-based ranking ──────────────────────────────
+        # If the user expressed a price/quality intent (budget, premium, safety, etc.)
+        # sort results by that signal rather than default rating-descending.
+        intent = session.preferences.get("ranking_intent", "none")
+        intent_cfg = _PRICE_INTENT_CONFIG.get(intent)
+
+        if intent_cfg:
+            sorted_results = sorted(results, key=intent_cfg["sort"])
+        else:
+            # Default: highest rating first
+            sorted_results = sorted(results, key=lambda x: x.rating, reverse=True)
+
+        # Enforce brand diversity across top 3 (regardless of intent)
         seen_brands: set[str] = set()
         diverse: list = []
-        for t in sorted(results, key=lambda x: x.rating, reverse=True):
+        for t in sorted_results:
             if t.brand not in seen_brands or len(diverse) < 3:
                 diverse.append(t)
                 seen_brands.add(t.brand)
             if len(diverse) == 3:
                 break
 
+        # Build slot labels from intent config (or fallback defaults)
+        if intent_cfg:
+            labels = intent_cfg["labels"]
+            types  = intent_cfg["types"]
+            punch_slot = intent_cfg["punch_slot"]
+        else:
+            labels = ["Top Pick", "Runner-up", "Budget Alt"]
+            types  = ["top_pick", "runner_up", "budget_alt"]
+            punch_slot = 0
+
         slot_defs = []
-        if diverse:
-            slot_defs.append((diverse[0], "Top Pick", "top_pick", True))
-        if len(diverse) > 1:
-            slot_defs.append((diverse[1], "Runner-up", "runner_up", False))
-        # Budget alt = cheapest tyre not already in slot_defs
-        _used_ids = {s[0].id for s in slot_defs}
-        _budget_pool = sorted([t for t in results if t.id not in _used_ids], key=lambda t: t.member_price)
-        if _budget_pool:
-            slot_defs.append((_budget_pool[0], "Budget Alt", "budget_alt", False))
-        elif len(diverse) == 1 and results:
-            # Only 1 unique tyre exists — still show it as the sole option
-            pass  # top_pick already added above
+        for i, tyre in enumerate(diverse[:3]):
+            is_top = (i == punch_slot)
+            slot_defs.append((tyre, labels[i], types[i], is_top))
+
+        # If intent is NOT budget, still append cheapest option as Budget Alt when slot 3 is empty
+        if len(slot_defs) < 3 and intent != "budget":
+            _used_ids = {s[0].id for s in slot_defs}
+            _budget_pool = sorted([t for t in results if t.id not in _used_ids], key=lambda t: t.member_price)
+            if _budget_pool:
+                slot_defs.append((_budget_pool[0], "Budget Alt", "budget_alt", False))
 
         for tyre, tag, slot_type, is_top in slot_defs:
             msg = generate_personalised_msg.invoke({
@@ -1539,6 +1674,12 @@ async def chat(req: ChatRequest):
     # Keep tone in sync for the hardcoded template fallbacks
     session.preferences["tone"] = _detect_tone(msg)
 
+    # Detect price/quality intent — persists for session so "show me cheap ones"
+    # stays active even across subsequent messages (until overridden by a new intent).
+    detected_intent = _detect_price_intent(msg)
+    if detected_intent != "none":
+        session.preferences["ranking_intent"] = detected_intent
+
     cards = []
     comparison = None
     appointment_slots = []
@@ -1585,10 +1726,16 @@ async def chat(req: ChatRequest):
         v = user.vehicle
 
         use_case = session.preferences.get("use_case", "")
-        path_hint = (
-            "Include their previous tyre choice plus two alternatives."
-            if session.user_path == "A" else
-            "Show top pick, runner-up, and a budget option."
+        ranking_intent = session.preferences.get("ranking_intent", "none")
+        _intent_labels = {
+            "budget": "cheapest options", "premium": "top-quality options",
+            "performance": "best-performing options", "safety": "safest options",
+            "longevity": "longest-lasting options", "value": "best value-for-money options",
+        }
+        intent_note = (
+            f"The member asked for {_intent_labels[ranking_intent]} — acknowledge that in one word (e.g. 'Sorted by budget!' / 'Here are the safest picks!')."
+            if ranking_intent != "none" else
+            ("Include their previous tyre choice plus two alternatives." if session.user_path == "A" else "Show top pick, runner-up, and a budget option.")
         )
         system = (
             f"{_PERSONA} "
@@ -1596,11 +1743,12 @@ async def chat(req: ChatRequest):
             f"Write ONE short sentence (max 20 words) handing over the cards. "
             f"Include their name ({first}), their vehicle ({v.year} {v.make} {v.model}), "
             f"and{' their ' + use_case + ' and' if use_case else ''} the season ({season}) in {city}. "
-            f"{path_hint} No emoji. Do not list the tyres — the UI shows the cards."
+            f"{intent_note} No emoji. Do not list the tyres — the UI shows the cards."
         )
         ctx = (
             f"Member: {first} | Vehicle: {v.year} {v.make} {v.model} | "
             f"City: {city} | Season: {season} | Use case: {use_case or 'everyday'} | "
+            f"Intent: {ranking_intent} | "
             f"Path: {'A (returning)' if session.user_path == 'A' else 'B (new buyer)'} | "
             f"Cards ready: {len(cards)}"
         )
@@ -2004,18 +2152,29 @@ async def chat(req: ChatRequest):
                 first = user.name.split()[0] if user else "there"
                 car_label = session.preferences.get("car_label", "")
                 use_case = session.preferences.get("use_case", "")
+                _ranking_intent = session.preferences.get("ranking_intent", "none")
+                _intent_labels = {
+                    "budget": "cheapest options", "premium": "top-quality options",
+                    "performance": "best-performing options", "safety": "safest options",
+                    "longevity": "longest-lasting options", "value": "best value-for-money options",
+                }
+                _intent_note = (
+                    f"Member asked for {_intent_labels[_ranking_intent]} — say that's sorted in your reply."
+                    if _ranking_intent != "none" else
+                    "Mention different price points and brands."
+                )
                 _card_system = (
                     f"{_PERSONA} {_lang_instr} "
                     f"You've just pulled up tyre recommendations. "
                     f"Write ONE short sentence (max 20 words) handing over the cards. "
                     f"Include their name ({first}), their car ({car_label or tyre_size}), "
                     f"and{' their ' + use_case + ' and' if use_case else ''} season ({season}). "
-                    f"Mention different price points and brands. No emoji."
+                    f"{_intent_note} No emoji."
                 )
                 _card_ctx = (
                     f"Member: {first} | Car: {car_label or tyre_size} | "
                     f"Size: {tyre_size} | Season: {season} | City: {city} | "
-                    f"Use case: {use_case or 'everyday'} | Cards: {len(cards)}"
+                    f"Intent: {_ranking_intent} | Use case: {use_case or 'everyday'} | Cards: {len(cards)}"
                 )
                 response_text = _llm_respond(req.session_id, _card_system, _card_ctx)
                 collect_feedback(req.session_id, "orchestrator", "implicit", "cards_shown",
@@ -2543,7 +2702,140 @@ async def image_analyse(req: ImageAnalyseRequest):
             "drop_recovery": None,
         })
 
-    # ── Scenario: tread or car — health analysis ─────────────────────────────
+    # ── Scenario: car_identified — detected car make/model → find tyres ─────
+    if scenario == "car_identified":
+        car_make       = result.get("car_make", "")
+        car_model      = result.get("car_model", "")
+        car_confidence = result.get("car_confidence", "medium")
+        health_score   = result.get("health_score", 7)
+        recommendation = result.get("recommendation", "continue")
+
+        car_text = f"{car_make} {car_model}".strip()
+        tyre_size = _infer_size_from_text(car_text) if car_text else None
+
+        if tyre_size:
+            # Car recognised + tyre size known → show recommendations immediately
+            session.preferences["override_tyre_size"] = tyre_size
+            session.preferences["car_label"] = car_text
+
+            locs_path = Path(__file__).parent / "data" / "locations.json"
+            locs = json.loads(locs_path.read_text(encoding="utf-8")) if locs_path.exists() else []
+
+            city = user.location.city if user and user.location else ""
+            season = _detect_season(city)
+            terrain = _infer_terrain(user.driving_habits) if user else "highway"
+
+            results = search_tyres(size=tyre_size, season=season, terrain=terrain, in_stock_only=True)
+            if len(results) < 3:
+                results += search_tyres(size=tyre_size, in_stock_only=True)
+            seen_ids: set[str] = set()
+            unique: list = []
+            for t in results:
+                if t.id not in seen_ids:
+                    seen_ids.add(t.id)
+                    unique.append(t)
+            results = unique[:6]
+
+            # Brand diversity
+            seen_brands: set[str] = set()
+            diverse: list = []
+            for t in sorted(results, key=lambda x: x.rating, reverse=True):
+                if t.brand not in seen_brands or len(diverse) < 3:
+                    diverse.append(t)
+                    seen_brands.add(t.brand)
+                if len(diverse) == 3:
+                    break
+
+            conf_qualifier = " (I'm fairly confident — double-check if unsure)" if car_confidence != "high" else ""
+            health_note = ""
+            if recommendation in ("replace_soon", "replace_now") or health_score < 4:
+                health_note = " Your tyres look like they need attention too —"
+
+            intro = (
+                f"I can see a **{car_text}** in your photo{conf_qualifier}.{health_note} "
+                f"Here are the best tyres available for it ({tyre_size}):"
+            )
+
+            if not diverse:
+                from app.services.stock_service import get_available_sizes
+                available = get_available_sizes()
+                return JSONResponse({
+                    "message": (
+                        f"I spotted a **{car_text}** in your image — great car! "
+                        f"We don't currently carry **{tyre_size}** tyres in stock. "
+                        f"Sizes we do carry: {', '.join(available[:6])}."
+                    ),
+                    "cards": [], "stage": session.stage,
+                    "quick_replies": [
+                        {"label": "Enter tyre size manually", "message": "I want to enter my tyre size manually"},
+                    ],
+                    "comparison": None, "appointment_slots": [], "booking_card": None, "drop_recovery": None,
+                })
+
+            member_ctx = json.dumps({
+                "driving_habits": user.driving_habits if user else ["highway"],
+                "location": user.location.model_dump() if user else {"city": "Unknown", "zip": "00000"},
+                "membership_tier": user.membership_tier if user else "standard",
+                "vehicle": user.vehicle.model_dump() if user else {"make": car_make, "model": car_model, "year": 2023},
+            })
+
+            slot_defs = [
+                (diverse[0], "Top Pick",  "top_pick",  True),
+                (diverse[1] if len(diverse) > 1 else diverse[0], "Runner-up", "runner_up",  False),
+                (diverse[2] if len(diverse) > 2 else diverse[-1], "Budget Alt", "budget_alt", False),
+            ]
+
+            cards = []
+            for tyre, tag, slot_type, is_top in slot_defs:
+                msg_text = generate_personalised_msg.invoke({
+                    "tyre_json": json.dumps(tyre.model_dump()),
+                    "member_context_json": member_ctx,
+                    "slot_type": slot_type,
+                })
+                punch = generate_punch_line.invoke({"tyre_json": json.dumps(tyre.model_dump())}) if is_top else None
+                cards.append({
+                    "tyre": tyre.model_dump(),
+                    "slot_tag": tag,
+                    "personalised_msg": msg_text,
+                    "stock_badge": get_stock_badge(tyre, locs),
+                    "punch_line": punch,
+                })
+
+            session.stage = "browse"
+            session.preferences["last_cards_ids"] = [c["tyre"]["id"] for c in cards]
+
+            return JSONResponse({
+                "message": intro,
+                "cards": cards,
+                "stage": session.stage,
+                "quick_replies": [],
+                "comparison": None,
+                "appointment_slots": [],
+                "booking_card": None,
+                "drop_recovery": None,
+            })
+
+        else:
+            # Car recognised but model not in our size map → ask user to confirm
+            conf_qualifier = " (I think)" if car_confidence != "high" else ""
+            session.preferences["partial_make"] = car_make
+            session.stage = "collect_vehicle"
+            return JSONResponse({
+                "message": (
+                    f"I can see a **{car_text}**{conf_qualifier} in your photo! "
+                    f"I don't have the exact tyre size for that model in my database. "
+                    f"Could you confirm the model, or type the tyre size from the sidewall? "
+                    f"(e.g. 205/55R16 — it's printed on the tyre)"
+                ),
+                "cards": [], "stage": session.stage,
+                "quick_replies": [
+                    {"label": f"It's a {car_model}", "message": f"It's a {car_make} {car_model}"},
+                    {"label": "Enter tyre size", "message": "I'll enter the tyre size manually"},
+                ],
+                "comparison": None, "appointment_slots": [], "booking_card": None, "drop_recovery": None,
+            })
+
+    # ── Scenario: tread or car (unidentified) — health analysis ─────────────
     if scenario in ("tread", "car"):
         health_msg        = build_health_message(result)
         score             = result.get("health_score", 10)
@@ -2553,8 +2845,6 @@ async def image_analyse(req: ImageAnalyseRequest):
         if needs_replacement:
             if user:
                 # Ask whether to use the member's existing car or a different one.
-                # These messages are phrased to match the /chat intent router so clicking
-                # either chip continues naturally through the recommendation flow.
                 v = user.vehicle
                 car_label = f"{v.year} {v.make} {v.model}"
                 follow_up = f"\nWould you like me to find replacement tyres for your {car_label}?"
@@ -2564,17 +2854,14 @@ async def image_analyse(req: ImageAnalyseRequest):
                     {"label": "No, I drive a different car",
                      "message": "No, I have a different vehicle"},
                 ]
-                # Set stage so /chat treats the next reply as a vehicle confirmation
                 session.stage = "confirm_vehicle"
             else:
-                # Member not logged in — generic prompt to start the tyre search flow
                 follow_up = "\nWould you like me to find replacement tyres for you?"
                 quick_replies = [
                     {"label": "Yes, find me tyres", "message": "Yes, find me tyres"},
                     {"label": "No thanks",           "message": "No thanks"},
                 ]
         else:
-            # Healthy tyres — no action needed, no chips shown
             follow_up = ""
             quick_replies = []
 

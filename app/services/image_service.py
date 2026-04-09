@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Prompt — instructs Claude to classify and analyse the tyre image
 # ---------------------------------------------------------------------------
-_VISION_PROMPT = """Analyse this tyre image and return ONLY a JSON object — no markdown, no explanation.
+_VISION_PROMPT = """Analyse this image and return ONLY a JSON object — no markdown, no explanation.
 
 Determine which scenario applies:
 
@@ -45,8 +45,18 @@ Score the tyre health. DEFAULT to 7 or above unless you see obvious damage. Rule
 recommendation must be exactly one of: "continue" (score 5+), "replace_soon" (score 3-4), "replace_now" (score 1-2).
 Return: {"scenario":"tread","health_score":8,"wear_level":"good","tread_depth_estimate":"6mm","wear_pattern":"even","recommendation":"continue","findings":["Finding 1","Finding 2"]}
 
-SCENARIO C — VEHICLE (image shows a car and tyres are visible on it):
-If tyres on the vehicle look inflated and normal with no obvious damage → score 7-8. Only go lower for visible bulges, flat spots, or completely bald tread.
+SCENARIO C — VEHICLE / CAR (image shows a car — even partially):
+FIRST try to identify the car make and model. Look for:
+  - Brand badge or logo (grille, boot, steering wheel)
+  - Distinctive body shape, headlight/taillight design
+  - Any visible text on the car
+If you can identify the make/model, use scenario "car_identified".
+If the car is unrecognisable or too generic, use scenario "car".
+
+For "car_identified": ALSO score the visible tyres (default 7-8 unless obvious damage).
+Return: {"scenario":"car_identified","car_make":"Tata","car_model":"Nexon","car_confidence":"high","health_score":7,"wear_level":"good","recommendation":"continue","findings":["Tyres appear well inflated"]}
+
+For "car" (unidentified): Score tyres as above.
 Return: {"scenario":"car","health_score":7,"wear_level":"good","recommendation":"continue","findings":["Finding 1"]}
 
 SCENARIO D — UNCLEAR (cannot determine tyre-related information):
