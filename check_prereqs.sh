@@ -137,11 +137,14 @@ echo ""
 
 # ── Ports ────────────────────────────────────────────────────────────────────
 echo -e "${BOLD}Ports${RESET}"
+APP_PORT=$(grep -E "^APP_PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+APP_PORT=${APP_PORT:-8080}
+
 if command -v ss &>/dev/null; then
-    if ss -tuln | grep -q ":8000 "; then
-        warn "Port 8000 already in use  →  sudo fuser -k 8000/tcp"
+    if ss -tuln | grep -q ":${APP_PORT} "; then
+        warn "Port $APP_PORT already in use  →  sudo fuser -k ${APP_PORT}/tcp  (or change APP_PORT in .env)"
     else
-        ok "Port 8000 is free"
+        ok "Port $APP_PORT is free  (APP_PORT from .env)"
     fi
     if ss -tuln | grep -q ":5432 "; then
         warn "Port 5432 already in use — deploy.sh will use port 5433 for Docker Postgres"

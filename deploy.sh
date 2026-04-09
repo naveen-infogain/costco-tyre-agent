@@ -23,6 +23,10 @@ DB_USER="postgres"
 DB_PASS="postgres"
 DB_PORT="5432"
 
+# App port — read from .env if set, else default 8080
+APP_PORT=$(grep -E "^APP_PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+APP_PORT=${APP_PORT:-8080}
+
 echo ""
 echo -e "${BOLD}=============================================${RESET}"
 echo -e "${BOLD}  TireAssist — Ubuntu Deployment${RESET}"
@@ -125,8 +129,9 @@ update_env "DB_PORT"     "$DB_PORT"
 update_env "DB_NAME"     "$DB_NAME"
 update_env "DB_USER"     "$DB_USER"
 update_env "DB_PASSWORD" "$DB_PASS"
+update_env "APP_PORT"    "$APP_PORT"
 
-ok ".env DB settings configured"
+ok ".env DB + port settings configured (APP_PORT=$APP_PORT)"
 echo ""
 
 # =============================================================================
@@ -135,6 +140,16 @@ echo ""
 info "Step 3 — Starting PostgreSQL in Docker..."
 
 # If port 5432 is already taken, use 5433 and update .env
+# Check app port is free
+if ss -tuln 2>/dev/null | grep -q ":${APP_PORT} "; then
+    warn "Port $APP_PORT is in use — trying $((APP_PORT+1))..."
+    APP_PORT=$((APP_PORT+1))
+    update_env "APP_PORT" "$APP_PORT"
+    ok "Using port $APP_PORT instead"
+else
+    ok "App port $APP_PORT is free"
+fi
+
 if ss -tuln 2>/dev/null | grep -q ":5432 "; then
     warn "Port 5432 in use — using 5433 for Docker Postgres"
     DB_PORT="5433"
@@ -272,13 +287,13 @@ echo -e "${GREEN}${BOLD}=============================================${RESET}"
 echo -e "${GREEN}${BOLD}  Deployment complete!${RESET}"
 echo -e "${GREEN}${BOLD}=============================================${RESET}"
 echo ""
-echo -e "  App:        ${BOLD}http://${HOST_IP}:8000${RESET}"
-echo -e "  Health:     http://${HOST_IP}:8000/health"
-echo -e "  Dashboard:  http://${HOST_IP}:8000/dashboard"
+echo -e "  App:        ${BOLD}http://${HOST_IP}:${APP_PORT}${RESET}"
+echo -e "  Health:     http://${HOST_IP}:${APP_PORT}/health"
+echo -e "  Dashboard:  http://${HOST_IP}:${APP_PORT}/dashboard"
 echo -e "  Postgres:   localhost:${DB_PORT}  db=${DB_NAME}  user=${DB_USER}"
 echo ""
 echo "  Press Ctrl+C to stop the server."
 echo ""
 
 source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+uvicorn app.main:app --host 0.0.0.0 --port "$APP_PORT" --workers 1

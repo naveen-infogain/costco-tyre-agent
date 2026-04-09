@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import json
 import logging
 import os
 import random
@@ -607,6 +608,80 @@ def load_engagements(cur) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Synthetic Indian tyre data loader — from app/data/tyres.json (SYN-* entries)
+# ---------------------------------------------------------------------------
+TYRES_JSON = Path(__file__).parent.parent / "app" / "data" / "tyres.json"
+
+def load_synthetic_tyres(cur) -> None:
+    """
+    Insert all synthetic tyre entries (id prefix SYN-) from tyres.json into
+    the products table. These are Indian-market tyres (MRF, CEAT, Apollo, etc.)
+    that are not present in the Salesforce CRM CSVs.
+
+    Uses ON CONFLICT DO NOTHING — safe to re-run.
+    """
+    if not TYRES_JSON.exists():
+        log.warning("tyres.json not found — skipping synthetic tyre load")
+        return
+
+    with open(TYRES_JSON, encoding="utf-8") as f:
+        all_tyres = json.load(f)
+
+    # Only insert SYN-* entries — CRM products are already loaded from CSVs
+    syn_tyres = [t for t in all_tyres if str(t.get("id", "")).startswith("SYN-")]
+    log.info("Loading %d synthetic Indian tyres from tyres.json …", len(syn_tyres))
+
+    data = []
+    for t in syn_tyres:
+        stock = t.get("stock", {})
+        data.append((
+            t["id"],                                    # sf_id (reuse id field)
+            f"{t['brand']} {t['model']}",               # name
+            t["brand"],
+            t["model"],
+            t["size"],
+            None,                                       # width (not in JSON schema)
+            None,                                       # aspect_ratio
+            None,                                       # rim_diameter
+            t.get("price"),
+            t.get("member_price"),
+            stock.get("qty", 0),
+            t.get("description", ""),
+            t.get("image_url", ""),
+            False,                                      # installation_included
+            "Tire",                                     # category
+            t.get("season", "all-season"),
+            t.get("terrain", "highway"),
+            t.get("load_index"),
+            t.get("speed_rating"),
+            t.get("wet_grip"),
+            t.get("noise_db"),
+            t.get("tread_life_km"),
+            t.get("rating"),
+            t.get("review_count"),
+            t.get("warranty_years"),
+            t.get("active_promotion"),
+            stock.get("warehouse_id", "W001"),
+            None,                                       # created_at
+        ))
+
+    execute_batch(cur, """
+        INSERT INTO products
+            (sf_id, name, brand, model, size, width, aspect_ratio, rim_diameter,
+             price, member_price, units_in_stock, description, image_url,
+             installation_included, category, season, terrain, load_index,
+             speed_rating, wet_grip, noise_db, tread_life_km, rating, review_count,
+             warranty_years, active_promotion, warehouse_id, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (sf_id) DO UPDATE SET
+            units_in_stock = EXCLUDED.units_in_stock,
+            member_price   = EXCLUDED.member_price,
+            rating         = EXCLUDED.rating
+    """, data)
+    log.info("  ✓ %d synthetic Indian tyres inserted/updated", len(data))
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
@@ -632,6 +707,9 @@ def main():
             load_carts(cur)
             load_cart_items(cur)
             load_engagements(cur)
+
+            # Synthetic Indian market tyres (MRF, CEAT, Apollo, etc.) from tyres.json
+            load_synthetic_tyres(cur)
 
     conn.close()
     log.info("Done. Database is ready — set DATABASE_URL and restart the app.")
