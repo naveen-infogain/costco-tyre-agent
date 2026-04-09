@@ -81,7 +81,7 @@ source venv/bin/activate 2>/dev/null || true
 python3 - <<PYEOF
 import sys, os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=".env")
 try:
     import psycopg2
     conn = psycopg2.connect(
