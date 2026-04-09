@@ -77,7 +77,11 @@ function parseNaturalSlot(text) {
 const SLOT_TRIGGER = /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|day after)\b.*\d{1,2}|\b\d{1,2}\s*(am|pm|a\.m\.|p\.m\.)|\bslot\b.*\d{1,2}|\b\d{1,2}.*\bslot\b/i
 
 export function useChat() {
-  const sessionId = useRef(crypto.randomUUID()).current
+  const sessionId = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'sess-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)
+  ).current
   const [messages, setMessages] = useState([])
   const [stage, setStage] = useState('enter')
   const [isTyping, setIsTyping] = useState(false)
