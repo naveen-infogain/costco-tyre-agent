@@ -123,7 +123,7 @@ echo ""
 echo -e "${BOLD}Docker${RESET}"
 if command -v docker &>/dev/null; then
     ok "docker $(docker --version | awk '{print $3}' | tr -d ',')"
-    if docker info &>/dev/null 2>&1; then
+    if sudo docker info &>/dev/null 2>&1 || docker info &>/dev/null 2>&1; then
         ok "Docker daemon is running"
     else
         fail "Docker installed but daemon not running  →  sudo systemctl start docker"

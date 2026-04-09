@@ -88,7 +88,7 @@ ok "Node.js $(node -v)"
 if ! command -v docker &>/dev/null; then
     fail "Docker not found. Install it: sudo apt install docker.io && sudo systemctl start docker"
 fi
-if ! docker info &>/dev/null 2>&1; then
+if ! sudo docker info &>/dev/null 2>&1 && ! docker info &>/dev/null 2>&1; then
     fail "Docker daemon not running. Start it: sudo systemctl start docker"
 fi
 ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
