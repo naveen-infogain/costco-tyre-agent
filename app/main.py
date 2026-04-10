@@ -873,6 +873,16 @@ _LANG_MARKERS: dict[str, set[str]] = {
         "aahe", "bagh", "mala", "tumhi", "sangto", "kara", "yeto",
         "nako", "hote", "aala",
     },
+    "Spanish": {
+        "hola", "gracias", "quiero", "necesito", "cuanto", "donde", "como",
+        "bueno", "bien", "claro", "pero", "para", "tengo", "coche", "auto",
+        "precio", "barato", "mejor", "ayuda", "busco",
+    },
+    "Russian": {
+        "привет", "спасибо", "хочу", "нужно", "сколько", "где", "как",
+        "хорошо", "машина", "авто", "цена", "дешево", "лучший", "помогите",
+        "ищу", "купить", "шина", "колесо",
+    },
     "Hindi": {
         "yaar", "bhai", "haan", "nahi", "nahin", "kya", "acha", "accha", "theek",
         "bolo", "karo", "leke", "lekar", "gaadi", "chalte", "jaana", "milega",
@@ -918,7 +928,7 @@ def _detect_language(msg: str) -> str:
       Pass 2 — morphological suffix patterns (catches conjugated forms)
 
     Returns one of: Telugu | Tamil | Kannada | Malayalam | Bengali | Marathi |
-                    Hindi | casual_en | English
+                    Hindi | Spanish | Russian | casual_en | English
 
     Caller stores result in session.preferences['language'] so it persists.
 
@@ -951,7 +961,7 @@ def _detect_language(msg: str) -> str:
 def _detect_tone(msg: str) -> str:
     """Legacy tone label — derived from language for backwards compatibility."""
     lang = _detect_language(msg)
-    if lang in ("Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Bengali", "Marathi"):
+    if lang in ("Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Bengali", "Marathi", "Spanish", "Russian"):
         return "hinglish"
     if lang == "casual_en":
         return "casual"
@@ -991,6 +1001,16 @@ _LANG_INSTRUCTION: dict[str, str] = {
         "Reply in Hinglish — mix Hindi naturally into English sentences. "
         "Use words like yaar, boss, chalo, sahi where they feel natural. "
         "Keep it short and punchy. Never be stiff or over-formal."
+    ),
+    "Spanish": (
+        "The user is writing in Spanish. Reply entirely in Spanish. "
+        "Keep tyre sizes (e.g. 235/65R17), brand names, and prices in English. "
+        "Be warm and helpful — like a knowledgeable friend at the tyre shop."
+    ),
+    "Russian": (
+        "The user is writing in Russian. Reply entirely in Russian. "
+        "Keep tyre sizes (e.g. 235/65R17), brand names, and prices in English. "
+        "Be professional but friendly."
     ),
     "casual_en": (
         "The user is speaking casually. Match their energy — "

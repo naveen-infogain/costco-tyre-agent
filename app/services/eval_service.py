@@ -11,14 +11,13 @@ from typing import Optional
 _LOG_DIR = Path(__file__).parent.parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
 
-# v33 baseline scorecard (from CLAUDE.md)
+# v33 baseline scorecard — ordered by conversation flow, Guardrail excluded from display
 _SCORECARD: dict[str, dict] = {
-    "guardrail": {"agent": "Guardrail", "score": 86, "trend": 3, "status": "on_target"},
-    "rec_ranking": {"agent": "Rec & Ranking", "score": 78, "trend": 4, "status": "on_target"},
-    "compare": {"agent": "Compare", "score": 74, "trend": 4, "status": "on_target"},
-    "content": {"agent": "Content", "score": 71, "trend": 8, "status": "on_target"},
-    "appointment": {"agent": "Appointment", "score": 69, "trend": -2, "status": "under_review"},
-    "orchestrator": {"agent": "Orchestrator", "score": 67, "trend": 5, "status": "on_target"},
+    "orchestrator":  {"agent": "Orchestrator",   "score": 67, "trend":  5, "status": "on_target"},
+    "rec_ranking":   {"agent": "Rec & Ranking",  "score": 78, "trend":  4, "status": "on_target"},
+    "content":       {"agent": "Content",         "score": 71, "trend":  8, "status": "on_target"},
+    "compare":       {"agent": "Compare",         "score": 74, "trend":  4, "status": "on_target"},
+    "appointment":   {"agent": "Appointment",     "score": 69, "trend": -2, "status": "under_review"},
 }
 
 _FEEDBACK_LOG: list[dict] = []
