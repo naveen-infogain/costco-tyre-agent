@@ -4,8 +4,17 @@
 # Usage: sudo bash manage.sh [start|stop|restart|logs|status]
 # =============================================================================
 
-APP_PORT=$(grep -E "^APP_PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+# Resolve the project root to the directory containing this script,
+# so SSL files are always looked up relative to the project folder
+# regardless of where manage.sh is called from.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+APP_PORT=$(grep -E "^APP_PORT=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
 APP_PORT=${APP_PORT:-8001}
+SSL_KEYFILE=$(grep -E "^SSL_KEYFILE=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+SSL_KEYFILE=${SSL_KEYFILE:-"$SCRIPT_DIR/key.pem"}
+SSL_CERTFILE=$(grep -E "^SSL_CERTFILE=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+SSL_CERTFILE=${SSL_CERTFILE:-"$SCRIPT_DIR/cert.pem"}
 PIDFILE="/tmp/tireassist.pid"
 LOGFILE="/tmp/tireassist.log"
 HOST_IP=$(hostname -I | awk '{print $1}')
@@ -32,7 +41,17 @@ start() {
 
     echo -e "${BOLD}▶ Starting TireAssist on port $APP_PORT...${RESET}"
     source venv/bin/activate
+
+    SSL_ARGS=""
+    if [ -f "$SSL_KEYFILE" ] && [ -f "$SSL_CERTFILE" ]; then
+        SSL_ARGS="--ssl-keyfile $SSL_KEYFILE --ssl-certfile $SSL_CERTFILE"
+        ok "SSL enabled (key: $SSL_KEYFILE, cert: $SSL_CERTFILE)"
+    else
+        warn "SSL files not found — starting without SSL (HTTP only)"
+    fi
+
     nohup uvicorn app.main:app --host 0.0.0.0 --port "$APP_PORT" --workers 1 \
+        $SSL_ARGS \
         > "$LOGFILE" 2>&1 &
     echo $! > "$PIDFILE"
 
@@ -40,7 +59,9 @@ start() {
     if kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
         ok "TireAssist started (PID $(cat $PIDFILE))"
         echo ""
-        echo -e "  App:        ${BOLD}http://${HOST_IP}:${APP_PORT}${RESET}"
+        SCHEME="http"
+        [ -n "$SSL_ARGS" ] && SCHEME="https"
+        echo -e "  App:        ${BOLD}${SCHEME}://${HOST_IP}:${APP_PORT}${RESET}"
         echo -e "  Health:     http://${HOST_IP}:${APP_PORT}/health"
         echo -e "  Dashboard:  http://${HOST_IP}:${APP_PORT}/dashboard"
         echo -e "  Logs:       sudo bash manage.sh logs"

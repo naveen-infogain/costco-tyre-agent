@@ -132,6 +132,7 @@ app = FastAPI(title="Costco Tyre Agent", version="0.33.0")
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origin_regex=r"https://.*",  # allow all HTTPS origins
     allow_origins=["*"] if os.environ.get("APP_ENV", "dev") == "dev" else [],
     allow_credentials=True,
     allow_methods=["*"],
